@@ -1,0 +1,65 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile",
+      "type": "object",
+      "properties": {
+        "role": { "type": "string", "enum": ["mahasiswa", "dosen", "admin"] },
+        "name": { "type": "string", "maxLength": 100 },
+        "nim": { "type": "string", "maxLength": 50 },
+        "kelas": { "type": "string", "maxLength": 50 },
+        "email": { "type": "string", "maxLength": 100 }
+      },
+      "required": ["role", "name"]
+    },
+    "QuizModule": {
+      "title": "QuizModule",
+      "description": "Quiz module containing questions and settings",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "maxLength": 200 },
+        "code": { "type": "string", "maxLength": 50 },
+        "classes": { "type": "array" },
+        "questions": { "type": "array" },
+        "settings": { "type": "object" },
+        "createdBy": { "type": "string", "maxLength": 100 },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["title", "code", "createdBy", "createdAt"]
+    },
+    "QuizResult": {
+      "title": "QuizResult",
+      "description": "Result of a quiz attempt by a student",
+      "type": "object",
+      "properties": {
+        "quizId": { "type": "string", "maxLength": 100 },
+        "studentId": { "type": "string", "maxLength": 100 },
+        "studentName": { "type": "string", "maxLength": 100 },
+        "studentNim": { "type": "string", "maxLength": 50 },
+        "studentKelas": { "type": "string", "maxLength": 50 },
+        "score": { "type": "number" },
+        "correctAnswers": { "type": "number" },
+        "wrongAnswers": { "type": "number" },
+        "cheatingFlags": { "type": "number" },
+        "submittedAt": { "type": "number" },
+        "details": { "type": "array" }
+      },
+      "required": ["quizId", "studentId", "score", "submittedAt"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "modules/{moduleId}": {
+      "schema": "QuizModule",
+      "description": "Quiz modules"
+    },
+    "results/{resultId}": {
+      "schema": "QuizResult",
+      "description": "Quiz results"
+    }
+  }
+}
