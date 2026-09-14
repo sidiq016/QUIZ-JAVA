@@ -251,7 +251,7 @@ export default function DashboardAdminDosen({ user: initialUser, onLogout }: Pro
             <Menu className="w-6 h-6" />
           </button>
           <h2 className="text-2xl lg:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 tracking-tight flex items-center gap-2">
-            🚀 JAVA'S <span className="text-white font-medium text-lg ml-2 hidden sm:inline">Panel {user.role === 'admin' ? 'Admin' : 'Dosen'}</span>
+            JAVA'S <span className="text-white font-medium text-lg ml-2 hidden sm:inline">Panel {user.role === 'admin' ? 'Admin' : 'Dosen'}</span>
           </h2>
         </div>
         <div className="flex items-center gap-6">
@@ -276,9 +276,7 @@ export default function DashboardAdminDosen({ user: initialUser, onLogout }: Pro
         allUsers={usersList}
       />
       
-      {/* Sidebar Navigation Tabs (Horizontal for below header or integrated? The user requested 'filter' hidden/shown by hamburger. 
-          Actually, I can just use a secondary horizontal tab bar here, or keep the tabs in the SidebarDrawer.
-          Wait, I'll put a tab bar below the header. ) */}
+      {/* Tab Navigation */}
       <div className="relative z-10 w-full flex justify-center mt-6 px-6">
         <div className="bg-white/5 border border-white/10 backdrop-blur-md p-1.5 rounded-2xl flex gap-1 overflow-x-auto w-full max-w-xl">
           <button 
@@ -731,6 +729,7 @@ export default function DashboardAdminDosen({ user: initialUser, onLogout }: Pro
           </motion.div>
         )}
 
+        {/* MODAL POP-UP DETAIL JAWABAN SISWA (DIPERBAIKI) */}
         {viewingResult && (
           <motion.div 
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -753,38 +752,57 @@ export default function DashboardAdminDosen({ user: initialUser, onLogout }: Pro
                 {!viewingResult.details || viewingResult.details.length === 0 ? (
                   <div className="text-center text-slate-400 italic">Detail jawaban tidak tersedia.</div>
                 ) : (
-                  viewingResult.details.map((detail, idx) => {
-                    const mod = modules.find(m => m.id === viewingResult.moduleId);
-                    const q = mod?.questions[detail.questionIdx];
-                    if (!q) return null;
+                  viewingResult.details.map((detail: any, idx: number) => {
+                    // Cek modul melalui moduleId maupun quizId agar kompatibel
+                    const targetModId = viewingResult.moduleId || (viewingResult as any).quizId;
+                    const mod = modules.find(m => m.id === targetModId);
+                    
+                    // Ambil teks pertanyaan dari modul atau fallback dari detail tersimpan
+                    const questionText = mod?.questions[detail.questionIdx]?.question || detail.questionText || `Pertanyaan #${idx + 1}`;
+                    const options = mod?.questions[detail.questionIdx]?.options || detail.options || [];
+
                     const isCorrect = detail.selectedIdx === detail.correctIdx;
                     return (
                       <div key={idx} className={`bg-white/5 rounded-2xl p-5 border ${isCorrect ? 'border-emerald-500/30' : 'border-red-500/30'}`}>
                         <div className="flex justify-between items-start mb-4">
-                          <h4 dir="auto" className="font-bold text-white flex-1">{idx + 1}. {q.question}</h4>
-                          {isCorrect ? <CheckCircle className="w-6 h-6 text-emerald-400 shrink-0 ml-4" /> : <XCircle className="w-6 h-6 text-red-400 shrink-0 ml-4" />}
+                          <h4 dir="auto" className="font-bold text-white flex-1">{idx + 1}. {questionText}</h4>
+                          {isCorrect ? (
+                            <div className="flex items-center gap-1.5 text-emerald-400 text-xs font-bold uppercase tracking-wider shrink-0 ml-4 bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/20">
+                              <CheckCircle className="w-4 h-4" /> Benar
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5 text-red-400 text-xs font-bold uppercase tracking-wider shrink-0 ml-4 bg-red-500/10 px-3 py-1.5 rounded-lg border border-red-500/20">
+                              <XCircle className="w-4 h-4" /> Salah
+                            </div>
+                          )}
                         </div>
                         <div className="grid md:grid-cols-2 gap-3 text-sm">
-                          {q.options.map((opt, optIdx) => {
-                            let style = 'bg-white/5 border border-white/10 text-slate-400';
-                            let badge = null;
-                            if (optIdx === detail.correctIdx) {
-                              style = 'bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30';
-                              badge = <CheckCircle className="w-4 h-4 shrink-0 ml-auto text-emerald-400" />;
-                            } else if (optIdx === detail.selectedIdx) {
-                              style = 'bg-red-500/20 text-red-400 font-bold border border-red-500/30';
-                              badge = <XCircle className="w-4 h-4 shrink-0 ml-auto text-red-400" />;
-                            }
-                            return (
-                              <div key={optIdx} className={`p-3 rounded-xl flex items-center gap-2 ${style}`}>
-                                <div className={`w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold shrink-0 ${optIdx === detail.correctIdx ? 'bg-emerald-500 text-white' : optIdx === detail.selectedIdx ? 'bg-red-500 text-white' : 'bg-white/10 text-slate-400'}`}>
-                                  {String.fromCharCode(65 + optIdx)}
+                          {options.length > 0 ? (
+                            options.map((opt: string, optIdx: number) => {
+                              let style = 'bg-white/5 border border-white/10 text-slate-400';
+                              let badge = null;
+                              if (optIdx === detail.correctIdx) {
+                                style = 'bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30';
+                                badge = <CheckCircle className="w-4 h-4 shrink-0 ml-auto text-emerald-400" />;
+                              } else if (optIdx === detail.selectedIdx) {
+                                style = 'bg-red-500/20 text-red-400 font-bold border border-red-500/30';
+                                badge = <XCircle className="w-4 h-4 shrink-0 ml-auto text-red-400" />;
+                              }
+                              return (
+                                <div key={optIdx} className={`p-3 rounded-xl flex items-center gap-2 ${style}`}>
+                                  <div className={`w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold shrink-0 ${optIdx === detail.correctIdx ? 'bg-emerald-500 text-white' : optIdx === detail.selectedIdx ? 'bg-red-500 text-white' : 'bg-white/10 text-slate-400'}`}>
+                                    {String.fromCharCode(65 + optIdx)}
+                                  </div>
+                                  <span dir="auto" className="flex-1">{opt}</span>
+                                  {badge}
                                 </div>
-                                <span dir="auto" className="flex-1">{opt}</span>
-                                {badge}
-                              </div>
-                            );
-                          })}
+                              );
+                            })
+                          ) : (
+                            <div className="col-span-2 text-xs text-slate-500 italic">
+                              Jawaban Dipilih: {detail.selectedIdx >= 0 ? String.fromCharCode(65 + detail.selectedIdx) : 'Waktu Habis'} | Kunci: {String.fromCharCode(65 + detail.correctIdx)}
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
