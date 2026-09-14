@@ -12,7 +12,6 @@ const DashboardAdminDosen: React.FC<Props> = ({ user, onLogout, onStartProjector
   const [modules, setModules] = useState<any[]>(getModules());
   const [results, setResults] = useState<any[]>(getResults());
   
-  // State form upload dokumen AI
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
   const [code, setCode] = useState('');
@@ -41,41 +40,35 @@ const DashboardAdminDosen: React.FC<Props> = ({ user, onLogout, onStartProjector
     setError('');
 
     try {
-      // 1. Ambil API Key Gemini (dari environment Vite)
       const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY || '';
       if (!apiKey) {
-        throw new Error('API Key Gemini belum diatur di Vercel (VITE_GEMINI_API_KEY).');
+        throw new Error('API Key belum terbaca. Pastikan VITE_GEMINI_API_KEY sudah disetel di Vercel.');
       }
 
-      // 2. Ubah file dokumen (PDF/Word) menjadi Base64
       const base64Data = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.readAsDataURL(file);
         reader.onload = () => {
-          const result = reader.result as string;
-          resolve(result.split(',')[1]);
+          const res = reader.result as string;
+          resolve(res.split(',')[1]);
         };
         reader.onerror = err => reject(err);
       });
 
       const mimeType = file.type || (file.name.endsWith('.pdf') ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
 
-      // 3. Prompt instruksi ke Gemini AI
-      const promptText = `Anda adalah pembuat soal kuis akademik profesional.
-Buatlah 10 soal pilihan ganda dari isi dokumen materi terlampir ini.
-Format jawaban HARUS berupa JSON Array murni tanpa format markdown seperti contoh berikut:
+      const promptText = `Anda adalah pembuat kuis akademik profesional. Buat 10 soal pilihan ganda dari teks materi dokumen terlampir dalam format JSON Array murni:
 [
   {
-    "question": "Pertanyaan soal",
-    "options": ["Pilihan A", "Pilihan B", "Pilihan C", "Pilihan D"],
+    "question": "pertanyaan",
+    "options": ["A", "B", "C", "D"],
     "correctAnswer": 0
   }
 ]
 Ketentuan:
-- Gunakan bahasa dan aksara yang sama persis dengan dokumen materi sumber.
-- correctAnswer berupa angka index (0 untuk A, 1 untuk B, 2 untuk C, 3 untuk D).`;
+- Gunakan bahasa dan aksara yang persis sama dengan materi.
+- correctAnswer berupa index integer (0, 1, 2, atau 3).`;
 
-      // 4. Kirim langsung ke Google AI Studio (Gemini 2.5 Flash)
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -84,24 +77,17 @@ Ketentuan:
             {
               parts: [
                 { text: promptText },
-                {
-                  inline_data: {
-                    mime_type: mimeType,
-                    data: base64Data
-                  }
-                }
+                { inline_data: { mime_type: mimeType, data: base64Data } }
               ]
             }
           ],
-          generationConfig: {
-            responseMimeType: "application/json"
-          }
+          generationConfig: { responseMimeType: "application/json" }
         })
       });
 
       if (!response.ok) {
-        const errData = await response.json().catch(() => null);
-        throw new Error(errData?.error?.message || `Gagal menghubungi AI Gemini (Status: ${response.status})`);
+        const errJson = await response.json().catch(() => null);
+        throw new Error(errJson?.error?.message || `Gagal memanggil AI (HTTP ${response.status})`);
       }
 
       const resData = await response.json();
@@ -109,10 +95,9 @@ Ketentuan:
       const questions = JSON.parse(rawJson);
 
       if (!Array.isArray(questions) || questions.length === 0) {
-        throw new Error('AI tidak berhasil mengekstrak soal dari materi.');
+        throw new Error('AI tidak berhasil menyusun format soal.');
       }
 
-      // 5. Simpan langsung ke database lokal browser
       const newModule = {
         id: crypto.randomUUID(),
         title,
@@ -139,7 +124,7 @@ Ketentuan:
       setActiveTab('modules');
     } catch (err: any) {
       console.error(err);
-      setError(err.message || 'Terjadi kesalahan saat memproses dokumen dengan AI.');
+      setError(err.message || 'Terjadi kesalahan saat memproses materi.');
     } finally {
       setLoading(false);
     }
@@ -147,7 +132,6 @@ Ketentuan:
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-6">
-      {/* Header */}
       <div className="max-w-6xl mx-auto flex items-center justify-between border-b border-slate-800 pb-4 mb-8">
         <div className="flex items-center gap-3">
           <span className="text-xl font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-500">
@@ -170,15 +154,12 @@ Ketentuan:
       </div>
 
       <div className="max-w-6xl mx-auto">
-        {/* Navigation Tabs */}
         <div className="flex justify-center mb-8">
           <div className="bg-slate-900 border border-slate-800 p-1 rounded-xl flex gap-1">
             <button
               onClick={() => setActiveTab('modules')}
               className={`px-6 py-2 rounded-lg text-sm font-semibold transition ${
-                activeTab === 'modules'
-                  ? 'bg-slate-800 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-white'
+                activeTab === 'modules' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-400 hover:text-white'
               }`}
             >
               Modul
@@ -186,9 +167,7 @@ Ketentuan:
             <button
               onClick={() => setActiveTab('results')}
               className={`px-6 py-2 rounded-lg text-sm font-semibold transition ${
-                activeTab === 'results'
-                  ? 'bg-slate-800 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-white'
+                activeTab === 'results' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-400 hover:text-white'
               }`}
             >
               Hasil
@@ -203,7 +182,6 @@ Ketentuan:
               <p className="text-sm text-slate-400">Buat kuis baru atau atur modul yang sudah ada.</p>
             </div>
 
-            {/* Form Upload AI */}
             <div className="max-w-xl mx-auto bg-slate-900/60 border border-slate-800/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl mb-12">
               <h2 className="text-base font-semibold text-white mb-4 flex items-center gap-2">
                 <span>📄</span> Buat Modul Baru dari Dokumen
@@ -270,7 +248,6 @@ Ketentuan:
               </div>
             </div>
 
-            {/* List Modul */}
             <div>
               <h3 className="text-lg font-bold text-white mb-4">Modul Aktif</h3>
               {modules.length === 0 ? (
@@ -313,7 +290,6 @@ Ketentuan:
             </div>
           </div>
         ) : (
-          /* Hasil Kuis */
           <div>
             <div className="text-center mb-8">
               <h1 className="text-2xl font-bold text-white mb-1">Hasil & Nilai Mahasiswa</h1>
