@@ -19,7 +19,10 @@ const DashboardAdminDosen: React.FC<Props> = ({ user, onLogout, onStartProjector
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Modal State
   const [editingModule, setEditingModule] = useState<any | null>(null);
+  const [viewQuestionsModule, setViewQuestionsModule] = useState<any | null>(null);
+  const [selectedStudentDetail, setSelectedStudentDetail] = useState<any | null>(null);
 
   const refreshData = () => {
     setModules(getModules());
@@ -71,7 +74,37 @@ const DashboardAdminDosen: React.FC<Props> = ({ user, onLogout, onStartProjector
     refreshData();
   };
 
-  // Export data hasil ke format CSV/Excel
+  // Simpan perubahan kunci jawaban / soal
+  const handleSaveQuestionsEdit = () => {
+    if (!viewQuestionsModule) return;
+    saveModule(viewQuestionsModule);
+    setViewQuestionsModule(null);
+    refreshData();
+    alert('Kunci jawaban dan daftar soal berhasil diperbarui!');
+  };
+
+  const handleCorrectAnswerChange = (qIndex: number, newCorrectIdx: number) => {
+    if (!viewQuestionsModule) return;
+    const updatedQuestions = [...viewQuestionsModule.questions];
+    updatedQuestions[qIndex].correctAnswer = newCorrectIdx;
+    setViewQuestionsModule({ ...viewQuestionsModule, questions: updatedQuestions });
+  };
+
+  const handleQuestionTextChange = (qIndex: number, newText: string) => {
+    if (!viewQuestionsModule) return;
+    const updatedQuestions = [...viewQuestionsModule.questions];
+    updatedQuestions[qIndex].question = newText;
+    setViewQuestionsModule({ ...viewQuestionsModule, questions: updatedQuestions });
+  };
+
+  const handleOptionChange = (qIndex: number, optIndex: number, newText: string) => {
+    if (!viewQuestionsModule) return;
+    const updatedQuestions = [...viewQuestionsModule.questions];
+    updatedQuestions[qIndex].options[optIndex] = newText;
+    setViewQuestionsModule({ ...viewQuestionsModule, questions: updatedQuestions });
+  };
+
+  // Export Excel CSV
   const handleExportExcel = () => {
     if (results.length === 0) {
       alert('Belum ada data pengerjaan mahasiswa untuk diexport.');
@@ -92,12 +125,16 @@ const DashboardAdminDosen: React.FC<Props> = ({ user, onLogout, onStartProjector
     ];
 
     const rows = results.map((r: any) => {
-      const wrongList = Array.isArray(r.wrongQuestions) && r.wrongQuestions.length > 0 
-        ? r.wrongQuestions.join('; ') 
-        : (r.wrongQuestionIndices ? r.wrongQuestionIndices.map((n: number) => `No.${n + 1}`).join('; ') : '-');
-      
-      const cheatStatus = r.tabSwitchCount > 0 
-        ? `Terdeteksi (${r.tabSwitchCount}x Pindah Tab)` 
+      let wrongList = '-';
+      if (Array.isArray(r.wrongQuestions) && r.wrongQuestions.length > 0) {
+        wrongList = r.wrongQuestions.join('; ');
+      } else if (Array.isArray(r.answersSummary)) {
+        const wrongs = r.answersSummary.filter((a: any) => !a.isCorrect).map((a: any) => `No.${a.questionNumber}`);
+        wrongList = wrongs.length > 0 ? wrongs.join('; ') : 'Tidak ada';
+      }
+
+      const cheatStatus = (r.tabSwitchCount && r.tabSwitchCount > 0)
+        ? `Terdeteksi (${r.tabSwitchCount}x Keluar Tab)` 
         : (r.cheatingStatus || 'Aman');
 
       const completedTime = r.completedAt 
@@ -360,7 +397,7 @@ Ketentuan:
                 <button
                   onClick={handleUpload}
                   disabled={loading}
-                  className="w-full py-3 rounded-xl font-semibold text-sm text-white bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:opacity-90 transition disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="w-full py-3 rounded-xl font-semibold text-sm text-white bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:opacity-90 transition disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
                 >
                   {loading ? 'AI Sedang Menelaah Dokumen & Menyusun Kuis...' : '⚡ Generate Soal Kuis (AI)'}
                 </button>
@@ -399,22 +436,28 @@ Ketentuan:
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 mt-5">
+                      <div className="flex flex-wrap items-center gap-2 mt-5">
                         <button
                           onClick={() => onStartProjector(mod)}
-                          className="flex-1 py-2 rounded-lg bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 text-xs font-semibold transition border border-emerald-500/30"
+                          className="flex-1 py-2 px-3 rounded-lg bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 text-xs font-semibold transition border border-emerald-500/30"
                         >
                           Mulai Proyektor
                         </button>
                         <button
-                          onClick={() => openEditModal(mod)}
-                          className="px-3 py-2 rounded-lg bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 text-xs font-semibold transition border border-cyan-500/20"
+                          onClick={() => setViewQuestionsModule(JSON.parse(JSON.stringify(mod)))}
+                          className="py-2 px-3 rounded-lg bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 text-xs font-semibold transition border border-indigo-500/20"
                         >
-                          ✏️ Edit
+                          📝 Bank Soal / Kunci
+                        </button>
+                        <button
+                          onClick={() => openEditModal(mod)}
+                          className="py-2 px-3 rounded-lg bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 text-xs font-semibold transition border border-cyan-500/20"
+                        >
+                          ⚙️ Atur
                         </button>
                         <button
                           onClick={() => handleDeleteModule(mod.id)}
-                          className="px-3 py-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 text-xs font-semibold transition border border-red-500/20"
+                          className="py-2 px-3 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 text-xs font-semibold transition border border-red-500/20"
                         >
                           Hapus
                         </button>
@@ -426,12 +469,12 @@ Ketentuan:
             </div>
           </div>
         ) : (
-          /* TAB HASIL DENGAN FITUR EXPORT EXCEL */
+          /* TAB HASIL */
           <div>
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8">
               <div>
                 <h1 className="text-2xl font-bold text-white mb-1">Hasil & Nilai Mahasiswa</h1>
-                <p className="text-sm text-slate-400">Daftar rekapan hasil dan analisis pengerjaan kuis.</p>
+                <p className="text-sm text-slate-400">Daftar rekapan hasil dan analisis detail pengerjaan mahasiswa.</p>
               </div>
               <button
                 onClick={handleExportExcel}
@@ -458,31 +501,36 @@ Ketentuan:
                       <th className="py-3.5 px-4 text-center">Salah di No.</th>
                       <th className="py-3.5 px-4 text-center">Indikasi Nyontek</th>
                       <th className="py-3.5 px-4 text-right">Waktu Selesai</th>
+                      <th className="py-3.5 px-4 text-center">Aksi</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800">
                     {results.map((res: any, idx: number) => {
-                      const wrongList = Array.isArray(res.wrongQuestions) && res.wrongQuestions.length > 0
-                        ? res.wrongQuestions.join(', ')
-                        : (res.wrongQuestionIndices ? res.wrongQuestionIndices.map((n: number) => `No.${n + 1}`).join(', ') : '-');
-                      
+                      let wrongNumbers = '-';
+                      if (Array.isArray(res.wrongQuestions) && res.wrongQuestions.length > 0) {
+                        wrongNumbers = res.wrongQuestions.join(', ');
+                      } else if (Array.isArray(res.answersSummary)) {
+                        const wrongs = res.answersSummary.filter((a: any) => !a.isCorrect).map((a: any) => `No.${a.questionNumber}`);
+                        wrongNumbers = wrongs.length > 0 ? wrongs.join(', ') : 'Tidak ada';
+                      }
+
                       const isCheating = (res.tabSwitchCount && res.tabSwitchCount > 0) || res.cheatingStatus === 'Nyontek';
 
                       return (
                         <tr key={idx} className="hover:bg-slate-800/30 transition">
-                          <td className="py-3 px-4 font-medium text-white">{res.studentName}</td>
-                          <td className="py-3 px-4 text-slate-400 text-xs">{res.nim}</td>
-                          <td className="py-3 px-4 text-slate-400 text-xs">{res.className}</td>
-                          <td className="py-3 px-4 text-center font-bold text-cyan-400">{res.score}</td>
+                          <td className="py-3 px-4 font-medium text-white">{res.studentName || res.name || '-'}</td>
+                          <td className="py-3 px-4 text-slate-400 text-xs">{res.nim || '-'}</td>
+                          <td className="py-3 px-4 text-slate-400 text-xs">{res.className || '-'}</td>
+                          <td className="py-3 px-4 text-center font-bold text-cyan-400">{res.score ?? 0}</td>
                           <td className="py-3 px-4 text-center text-xs">
-                            <span className="text-emerald-400 font-semibold">{res.correctAnswers}</span>
+                            <span className="text-emerald-400 font-semibold">{res.correctAnswers ?? 0}</span>
                             <span className="text-slate-500"> / </span>
                             <span className="text-red-400 font-semibold">
-                              {res.wrongAnswers ?? (res.totalQuestions ? res.totalQuestions - res.correctAnswers : 0)}
+                              {res.wrongAnswers ?? (res.totalQuestions ? res.totalQuestions - (res.correctAnswers || 0) : 0)}
                             </span>
                           </td>
-                          <td className="py-3 px-4 text-center text-xs text-red-400/90 font-mono">
-                            {wrongList}
+                          <td className="py-3 px-4 text-center text-xs text-red-400 font-mono font-medium">
+                            {wrongNumbers}
                           </td>
                           <td className="py-3 px-4 text-center text-xs">
                             {isCheating ? (
@@ -498,6 +546,14 @@ Ketentuan:
                           <td className="py-3 px-4 text-right text-xs text-slate-400">
                             {res.completedAt ? new Date(res.completedAt).toLocaleString('id-ID') : (res.timeFinished || '-')}
                           </td>
+                          <td className="py-3 px-4 text-center">
+                            <button
+                              onClick={() => setSelectedStudentDetail(res)}
+                              className="px-2.5 py-1 rounded bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 text-xs font-semibold border border-cyan-500/20 transition cursor-pointer"
+                            >
+                              🔍 Periksa
+                            </button>
+                          </td>
                         </tr>
                       );
                     })}
@@ -509,7 +565,190 @@ Ketentuan:
         )}
       </div>
 
-      {/* Modal Edit Modul */}
+      {/* POPUP 1: LIHAT BANK SOAL & RUBAH KUNCI JAWABAN */}
+      {viewQuestionsModule && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-3xl p-6 shadow-2xl my-8 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-800 mb-4">
+              <div>
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <span>📝</span> Bank Soal & Kunci Jawaban: {viewQuestionsModule.title}
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">Pilih radio button untuk menentukan kunci jawaban yang benar.</p>
+              </div>
+              <button
+                onClick={() => setViewQuestionsModule(null)}
+                className="text-slate-400 hover:text-white text-lg font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="overflow-y-auto pr-2 space-y-6 flex-1">
+              {viewQuestionsModule.questions?.map((q: any, qIdx: number) => (
+                <div key={qIdx} className="bg-slate-950/70 border border-slate-800 rounded-xl p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="w-6 h-6 rounded-full bg-cyan-500/20 text-cyan-400 text-xs font-bold flex items-center justify-center">
+                      {qIdx + 1}
+                    </span>
+                    <input
+                      type="text"
+                      value={q.question}
+                      onChange={(e) => handleQuestionTextChange(qIdx, e.target.value)}
+                      className="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-cyan-500"
+                    />
+                  </div>
+
+                  <div className="space-y-2 pl-8">
+                    {q.options?.map((opt: string, optIdx: number) => {
+                      const isCorrect = q.correctAnswer === optIdx;
+                      return (
+                        <div
+                          key={optIdx}
+                          className={`flex items-center gap-3 p-2 rounded-lg border transition ${
+                            isCorrect
+                              ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-300'
+                              : 'bg-slate-900/60 border-slate-800 text-slate-300'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name={`correct-${qIdx}`}
+                            checked={isCorrect}
+                            onChange={() => handleCorrectAnswerChange(qIdx, optIdx)}
+                            className="w-4 h-4 accent-emerald-500 cursor-pointer"
+                          />
+                          <span className="text-xs font-bold w-4">
+                            {String.fromCharCode(65 + optIdx)}.
+                          </span>
+                          <input
+                            type="text"
+                            value={opt}
+                            onChange={(e) => handleOptionChange(qIdx, optIdx, e.target.value)}
+                            className="flex-1 bg-transparent border-none text-xs text-inherit focus:outline-none"
+                          />
+                          {isCorrect && (
+                            <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded font-semibold">
+                              Kunci Benar
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex gap-3 pt-4 border-t border-slate-800 mt-4">
+              <button
+                type="button"
+                onClick={() => setViewQuestionsModule(null)}
+                className="flex-1 py-2.5 rounded-xl text-sm font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveQuestionsEdit}
+                className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition shadow-lg shadow-emerald-600/20 cursor-pointer"
+              >
+                Simpan Perubahan Kunci
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* POPUP 2: DETAIL JAWABAN PER NOMOR MAHASISWA */}
+      {selectedStudentDetail && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-2xl p-6 shadow-2xl my-8 max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-800 mb-4">
+              <div>
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <span>👤</span> Analisis Pengerjaan: {selectedStudentDetail.studentName || selectedStudentDetail.name || 'Mahasiswa'}
+                </h3>
+                <p className="text-xs text-slate-400">
+                  NIM: {selectedStudentDetail.nim || '-'} • Kelas: {selectedStudentDetail.className || '-'} • Skor: {selectedStudentDetail.score}
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedStudentDetail(null)}
+                className="text-slate-400 hover:text-white text-lg font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="overflow-y-auto pr-2 space-y-3 flex-1">
+              {Array.isArray(selectedStudentDetail.answersSummary) && selectedStudentDetail.answersSummary.length > 0 ? (
+                selectedStudentDetail.answersSummary.map((ans: any, i: number) => (
+                  <div
+                    key={i}
+                    className={`p-3.5 rounded-xl border ${
+                      ans.isCorrect
+                        ? 'bg-emerald-500/5 border-emerald-500/20'
+                        : 'bg-red-500/5 border-red-500/20'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs font-semibold text-white">
+                        Soal #{ans.questionNumber || i + 1}
+                      </span>
+                      {ans.isCorrect ? (
+                        <span className="text-[11px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">
+                          ✓ Benar (+{ans.points ?? 10})
+                        </span>
+                      ) : (
+                        <span className="text-[11px] font-bold text-red-400 bg-red-500/10 px-2 py-0.5 rounded">
+                          ✗ Salah ({ans.points ?? 0})
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-300 mb-2">{ans.questionText || `Pertanyaan nomor ${i + 1}`}</p>
+                    <div className="grid grid-cols-2 gap-2 text-xs bg-slate-950/50 p-2.5 rounded-lg border border-slate-800">
+                      <div>
+                        <span className="block text-[10px] text-slate-400">Jawaban Mahasiswa:</span>
+                        <span className={`font-semibold ${ans.isCorrect ? 'text-emerald-400' : 'text-red-400'}`}>
+                          {ans.selectedAnswerText || (ans.selectedAnswer != null ? `Opsi ${String.fromCharCode(65 + ans.selectedAnswer)}` : 'Tidak dijawab')}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] text-slate-400">Kunci Jawaban Asli:</span>
+                        <span className="font-semibold text-emerald-400">
+                          {ans.correctAnswerText || (ans.correctAnswer != null ? `Opsi ${String.fromCharCode(65 + ans.correctAnswer)}` : '-')}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="p-6 text-center text-slate-400 text-xs bg-slate-950/40 rounded-xl border border-slate-800">
+                  {selectedStudentDetail.wrongQuestions?.length > 0 ? (
+                    <p className="text-red-400 font-semibold">
+                      Mahasiswa ini tercatat salah pada nomor: {selectedStudentDetail.wrongQuestions.join(', ')}
+                    </p>
+                  ) : (
+                    <p>Mahasiswa ini belum mengirimkan rincian per butir soal.</p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="pt-4 border-t border-slate-800 mt-3 text-right">
+              <button
+                onClick={() => setSelectedStudentDetail(null)}
+                className="px-5 py-2 rounded-xl text-sm font-semibold bg-slate-800 hover:bg-slate-700 text-white transition"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* POPUP 3: EDIT PENGATURAN MODUL */}
       {editingModule && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl my-8">
