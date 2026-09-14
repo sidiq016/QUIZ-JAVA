@@ -69,29 +69,47 @@ Ketentuan:
 - Gunakan bahasa dan aksara yang persis sama dengan materi.
 - correctAnswer berupa index integer (0, 1, 2, atau 3).`;
 
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                { text: promptText },
-                { inline_data: { mime_type: mimeType, data: base64Data } }
-              ]
-            }
-          ],
-          generationConfig: { responseMimeType: "application/json" }
-        })
-      });
+      // Daftar model yang akan dicoba secara berurutan
+      const availableModels = ['gemini-3.6-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+      let resData: any = null;
+      let lastErrorMessage = '';
 
-      if (!response.ok) {
-        const errJson = await response.json().catch(() => null);
-        throw new Error(errJson?.error?.message || `Gagal memanggil AI (HTTP ${response.status})`);
+      for (const modelName of availableModels) {
+        try {
+          const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [
+                {
+                  parts: [
+                    { text: promptText },
+                    { inline_data: { mime_type: mimeType, data: base64Data } }
+                  ]
+                }
+              ],
+              generationConfig: { responseMimeType: "application/json" }
+            })
+          });
+
+          const data = await response.json().catch(() => null);
+
+          if (response.ok && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+            resData = data;
+            break;
+          } else {
+            lastErrorMessage = data?.error?.message || `Gagal pada model ${modelName}`;
+          }
+        } catch (err: any) {
+          lastErrorMessage = err.message || 'Koneksi error';
+        }
       }
 
-      const resData = await response.json();
-      const rawJson = resData.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
+      if (!resData) {
+        throw new Error(lastErrorMessage || 'Gagal memanggil layanan Gemini AI.');
+      }
+
+      const rawJson = resData.candidates[0].content.parts[0].text;
       const questions = JSON.parse(rawJson);
 
       if (!Array.isArray(questions) || questions.length === 0) {
