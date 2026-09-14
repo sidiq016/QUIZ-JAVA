@@ -7,27 +7,27 @@ interface Props {
   onStartProjector: (module: any) => void;
 }
 
-// 10 Karakter Bawaan Asli Proyek
-const AVATARS = [
-  { id: 'av-1', name: 'Karakter 1', icon: '👦' },
-  { id: 'av-2', name: 'Karakter 2', icon: '👧' },
-  { id: 'av-3', name: 'Karakter 3', icon: '👨‍🎓' },
-  { id: 'av-4', name: 'Karakter 4', icon: '👩‍🎓' },
-  { id: 'av-5', name: 'Karakter 5', icon: '🧑‍💼' },
-  { id: 'av-6', name: 'Karakter 6', icon: '👩‍💼' },
-  { id: 'av-7', name: 'Karakter 7', icon: '🧑‍💻' },
-  { id: 'av-8', name: 'Karakter 8', icon: '🧑‍🏫' },
-  { id: 'av-9', name: 'Karakter 9', icon: '🧓' },
-  { id: 'av-10', name: 'Karakter 10', icon: '👵' },
+// 10 Karakter Avatar Asli Proyek
+const AVATAR_CHARACTERS = [
+  { id: 'char-1', name: 'Karakter 1', icon: '👦' },
+  { id: 'char-2', name: 'Karakter 2', icon: '👧' },
+  { id: 'char-3', name: 'Karakter 3', icon: '👨‍🎓' },
+  { id: 'char-4', name: 'Karakter 4', icon: '👩‍🎓' },
+  { id: 'char-5', name: 'Karakter 5', icon: '🧑‍💼' },
+  { id: 'char-6', name: 'Karakter 6', icon: '👩‍💼' },
+  { id: 'char-7', name: 'Karakter 7', icon: '🧑‍💻' },
+  { id: 'char-8', name: 'Karakter 8', icon: '🧑‍🏫' },
+  { id: 'char-9', name: 'Karakter 9', icon: '🧓' },
+  { id: 'char-10', name: 'Karakter 10', icon: '👵' },
 ];
 
 const DashboardAdminDosen: React.FC<Props> = ({ user, onLogout, onStartProjector }) => {
   const [currentUser, setCurrentUser] = useState<any>(() => {
     try {
       const saved = localStorage.getItem('java_quiz_active_user');
-      return saved ? JSON.parse(saved) : (user || { name: 'firman', role: 'dosen', nim: '1253040007', class: 'pmh', avatarId: 'av-1' });
+      return saved ? JSON.parse(saved) : (user || { name: 'firman', role: 'dosen', nim: '1253040007', class: 'pmh', avatarId: 'char-1' });
     } catch {
-      return user || { name: 'firman', role: 'dosen', nim: '1253040007', class: 'pmh', avatarId: 'av-1' };
+      return user || { name: 'firman', role: 'dosen', nim: '1253040007', class: 'pmh', avatarId: 'char-1' };
     }
   });
 
@@ -38,7 +38,15 @@ const DashboardAdminDosen: React.FC<Props> = ({ user, onLogout, onStartProjector
     try { return getResults() || []; } catch { return []; }
   });
 
-  // State Input Pembuat Kuis AI
+  // Drawer Pengaturan State
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isEditingProfile, setIsEditingProfile] = useState(true);
+  const [nameInput, setNameInput] = useState(currentUser?.name || 'firman');
+  const [nimInput, setNimInput] = useState(currentUser?.nim || currentUser?.username || '1253040007');
+  const [classInput, setClassInput] = useState(currentUser?.class || currentUser?.className || 'pmh');
+  const [selectedAvatarId, setSelectedAvatarId] = useState(currentUser?.avatarId || 'char-1');
+
+  // Input Pembuat Kuis AI
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
   const [code, setCode] = useState('');
@@ -46,15 +54,7 @@ const DashboardAdminDosen: React.FC<Props> = ({ user, onLogout, onStartProjector
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // State Drawer Pengaturan
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [isEditingProfile, setIsEditingProfile] = useState(false);
-  const [profileName, setProfileName] = useState(currentUser?.name || 'firman');
-  const [profileNim, setProfileNim] = useState(currentUser?.nim || '1253040007');
-  const [profileClass, setProfileClass] = useState(currentUser?.class || 'pmh');
-  const [selectedAvatarId, setSelectedAvatarId] = useState(currentUser?.avatarId || 'av-1');
-
-  // Modal State
+  // Modals
   const [editingModule, setEditingModule] = useState<any | null>(null);
   const [viewQuestionsModule, setViewQuestionsModule] = useState<any | null>(null);
   const [selectedStudentDetail, setSelectedStudentDetail] = useState<any | null>(null);
@@ -72,9 +72,9 @@ const DashboardAdminDosen: React.FC<Props> = ({ user, onLogout, onStartProjector
     e.preventDefault();
     const updated = {
       ...currentUser,
-      name: profileName,
-      nim: profileNim,
-      class: profileClass,
+      name: nameInput,
+      nim: nimInput,
+      class: classInput,
       avatarId: selectedAvatarId
     };
     setCurrentUser(updated);
@@ -189,7 +189,7 @@ const DashboardAdminDosen: React.FC<Props> = ({ user, onLogout, onStartProjector
       });
 
       const mimeType = file.type || (file.name.endsWith('.pdf') ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-      const promptText = `Anda adalah pembuat kuis akademik. Buat 10 soal pilihan ganda dari teks dokumen terlampir dalam JSON Array murni:
+      const promptText = `Anda adalah pembuat kuis akademik. Buat 10 soal pilihan ganda dari teks materi dokumen dalam JSON Array:
 [
   {
     "question": "pertanyaan",
@@ -197,7 +197,7 @@ const DashboardAdminDosen: React.FC<Props> = ({ user, onLogout, onStartProjector
     "correctAnswer": 0
   }
 ]
-Ketentuan: correctAnswer berupa index integer 0, 1, 2, atau 3.`;
+Ketentuan: correctAnswer berupa angka index 0, 1, 2, atau 3.`;
 
       const availableModels = ['gemini-3.6-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
       let resData: any = null;
@@ -262,11 +262,11 @@ Ketentuan: correctAnswer berupa index integer 0, 1, 2, atau 3.`;
     }
   };
 
-  const activeAvatar = AVATARS.find(a => a.id === selectedAvatarId) || AVATARS[0];
+  const activeAvatar = AVATAR_CHARACTERS.find(a => a.id === selectedAvatarId) || AVATAR_CHARACTERS[0];
 
   return (
     <div className="min-h-screen bg-[#070b14] text-slate-100 flex flex-col font-sans select-none">
-      {/* Topbar Persis Akun Mahasiswa */}
+      {/* Top Navbar */}
       <header className="border-b border-slate-800/80 bg-[#0c1220]/80 backdrop-blur-md px-6 py-3.5 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <button
@@ -296,8 +296,8 @@ Ketentuan: correctAnswer berupa index integer 0, 1, 2, atau 3.`;
           >
             <div className="text-right hidden sm:block">
               <span className="font-bold text-xs text-white block leading-tight">{currentUser?.name || 'firman'}</span>
-              <span className="text-[10px] text-cyan-400 font-medium leading-tight">
-                {currentUser?.role === 'dosen' ? 'Dosen' : 'Mahasiswa'} • {currentUser?.class || 'pmh'}
+              <span className="block text-[10px] text-cyan-400 font-medium leading-tight">
+                {currentUser?.role === 'dosen' ? 'Dosen' : 'Mahasiswa Gen-Z'} • {currentUser?.class || 'pmh'}
               </span>
             </div>
             <div className="w-8 h-8 rounded-full bg-[#0d172a] border border-cyan-500/40 flex items-center justify-center text-base shadow-sm">
@@ -316,21 +316,21 @@ Ketentuan: correctAnswer berupa index integer 0, 1, 2, atau 3.`;
         </div>
       </header>
 
-      {/* Konten 2 Kolom Persis Halaman Mahasiswa */}
+      {/* Main Grid 2 Kolom Persis Halaman Mahasiswa di Video */}
       <main className="max-w-7xl mx-auto w-full px-6 py-6 flex-1 grid lg:grid-cols-12 gap-6">
         
         {/* Kolom Kiri: Input Generator & Daftar Modul Tersedia */}
         <div className="lg:col-span-6 space-y-6">
           
-          {/* Card Pembuat Kuis Dokumen (Menempati Posisi Masuk ke Ruang Kuis) */}
+          {/* Card Masuk ke Ruang Kuis / Buat Kuis Dokumen */}
           <div className="bg-[#0e1628]/80 border border-slate-800/90 rounded-2xl p-5 shadow-xl">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-9 h-9 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-lg">
                 🎓
               </div>
               <div>
-                <h2 className="text-sm font-bold text-white leading-tight">Buat Modul Kuis (AI)</h2>
-                <p className="text-[11px] text-slate-400 leading-tight">Unggah file dokumen materi untuk generate soal otomatis</p>
+                <h2 className="text-sm font-bold text-white leading-tight">Masuk ke Ruang Kuis / Buat Modul</h2>
+                <p className="text-[11px] text-slate-400 leading-tight">Masukkan kode atau upload file untuk generate materi kuis</p>
               </div>
             </div>
 
@@ -353,7 +353,7 @@ Ketentuan: correctAnswer berupa index integer 0, 1, 2, atau 3.`;
                   type="text"
                   value={code}
                   onChange={e => setCode(e.target.value)}
-                  placeholder="Kode Kuis"
+                  placeholder="CONTOH: KUIS-123"
                   className="bg-[#070b14] border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
                 />
               </div>
@@ -362,7 +362,7 @@ Ketentuan: correctAnswer berupa index integer 0, 1, 2, atau 3.`;
                 type="text"
                 value={classes}
                 onChange={e => setClasses(e.target.value)}
-                placeholder="Rombel / Kelas (contoh: PMH 3A, HES)"
+                placeholder="Rombel / Kelas (contoh: pmh)"
                 className="w-full bg-[#070b14] border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
               />
 
@@ -378,7 +378,7 @@ Ketentuan: correctAnswer berupa index integer 0, 1, 2, atau 3.`;
                   disabled={loading}
                   className="px-5 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white transition disabled:opacity-50 whitespace-nowrap cursor-pointer"
                 >
-                  {loading ? 'Proses...' : 'Generate'}
+                  {loading ? 'Proses...' : 'Gabung'}
                 </button>
               </div>
             </div>
@@ -392,7 +392,7 @@ Ketentuan: correctAnswer berupa index integer 0, 1, 2, atau 3.`;
 
             {modules.length === 0 ? (
               <div className="p-6 text-center text-slate-500 text-xs">
-                Belum ada modul yang dibuat.
+                Belum ada modul yang tersedia.
               </div>
             ) : (
               <div className="space-y-2.5">
@@ -406,7 +406,7 @@ Ketentuan: correctAnswer berupa index integer 0, 1, 2, atau 3.`;
                       <div className="flex items-center gap-2 mt-1">
                         <span className="text-[10px] text-slate-400">⏱ {mod.questions?.length || 0} Soal</span>
                         <span className="text-[9px] px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 font-medium">
-                          Kode: {mod.code}
+                          ✓ KELAS KAMU
                         </span>
                       </div>
                     </div>
@@ -429,7 +429,7 @@ Ketentuan: correctAnswer berupa index integer 0, 1, 2, atau 3.`;
                       <button
                         onClick={() => openEditModal(mod)}
                         className="w-8 h-8 rounded-lg bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 flex items-center justify-center text-xs transition cursor-pointer"
-                        title="Atur Pengaturan"
+                        title="Pengaturan Modul"
                       >
                         ⚙️
                       </button>
@@ -448,24 +448,26 @@ Ketentuan: correctAnswer berupa index integer 0, 1, 2, atau 3.`;
           </div>
         </div>
 
-        {/* Kolom Kanan: Rekap Hasil & Nilai (Menempati Posisi Riwayat Kuis Saya) */}
+        {/* Kolom Kanan: Riwayat Kuis Saya & Rekap Nilai */}
         <div className="lg:col-span-6">
           <div className="bg-[#0e1628]/80 border border-slate-800/90 rounded-2xl p-5 shadow-xl h-full flex flex-col">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-xs font-bold text-white flex items-center gap-2">
-                <span>📋</span> Rekap Nilai Mahasiswa
+                <span>✅</span> Riwayat Kuis Saya
               </h3>
-              <button
-                onClick={handleExportExcel}
-                className="px-3 py-1 rounded-lg text-[11px] font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition cursor-pointer flex items-center gap-1.5"
-              >
-                <span>📊</span> Export CSV
-              </button>
+              {results.length > 0 && (
+                <button
+                  onClick={handleExportExcel}
+                  className="px-3 py-1 rounded-lg text-[11px] font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition cursor-pointer flex items-center gap-1"
+                >
+                  <span>📊</span> Export CSV
+                </button>
+              )}
             </div>
 
             {results.length === 0 ? (
-              <div className="flex-1 flex items-center justify-center text-slate-500 text-xs py-12">
-                Belum ada mahasiswa yang menyelesaikan kuis.
+              <div className="flex-1 flex items-center justify-center text-slate-500 text-xs py-16">
+                Belum ada riwayat kuis.
               </div>
             ) : (
               <div className="overflow-y-auto space-y-2 flex-1 max-h-[600px] pr-1 text-xs">
@@ -511,12 +513,12 @@ Ketentuan: correctAnswer berupa index integer 0, 1, 2, atau 3.`;
 
       </main>
 
-      {/* Footer Hak Cipta Persis Video */}
+      {/* Footer */}
       <footer className="text-center py-4 text-[10px] text-slate-600 tracking-wider">
         © PROPERTY BY JAWA X JAVA'S STUDIOS COMPANY
       </footer>
 
-      {/* DRAWER PENGATURAN KIRI PERSIS VIDEO */}
+      {/* DRAWER PENGATURAN KIRI */}
       {isDrawerOpen && (
         <div className="fixed inset-0 z-50 flex">
           <div
@@ -543,13 +545,13 @@ Ketentuan: correctAnswer berupa index integer 0, 1, 2, atau 3.`;
               </div>
 
               {!isEditingProfile ? (
-                /* Card Profil Tersimpan (Sesuai Video) */
+                /* Card Profil Tersimpan */
                 <div className="bg-[#111c33] border border-slate-800/90 rounded-2xl p-5 text-center shadow-lg">
                   <div className="w-20 h-20 mx-auto mb-3 rounded-full bg-[#080d19] border-2 border-cyan-400 flex items-center justify-center text-4xl shadow-md shadow-cyan-500/20">
                     {activeAvatar.icon}
                   </div>
                   <h3 className="font-bold text-base text-white">{currentUser?.name || 'firman'}</h3>
-                  <p className="text-xs text-slate-400 capitalize">{currentUser?.role || 'Dosen'}</p>
+                  <p className="text-xs text-slate-400 capitalize">{currentUser?.role || 'Mahasiswa'}</p>
                   <p className="text-[11px] text-slate-500 mt-1">
                     NIM: {currentUser?.nim || '1253040007'} • Kelas: {currentUser?.class || 'pmh'}
                   </p>
@@ -573,7 +575,7 @@ Ketentuan: correctAnswer berupa index integer 0, 1, 2, atau 3.`;
                   <div>
                     <label className="block text-[11px] text-slate-400 mb-1.5 font-medium">Pilih Karakter:</label>
                     <div className="grid grid-cols-5 gap-1.5 bg-[#080d19] p-2 rounded-xl border border-slate-800">
-                      {AVATARS.map((av) => (
+                      {AVATAR_CHARACTERS.map((av) => (
                         <button
                           type="button"
                           key={av.id}
@@ -595,8 +597,8 @@ Ketentuan: correctAnswer berupa index integer 0, 1, 2, atau 3.`;
                       <label className="block text-[11px] text-slate-400 mb-1">Nama</label>
                       <input
                         type="text"
-                        value={profileName}
-                        onChange={e => setProfileName(e.target.value)}
+                        value={nameInput}
+                        onChange={e => setNameInput(e.target.value)}
                         required
                         className="w-full bg-[#080d19] border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
                       />
@@ -605,8 +607,8 @@ Ketentuan: correctAnswer berupa index integer 0, 1, 2, atau 3.`;
                       <label className="block text-[11px] text-slate-400 mb-1">NIM</label>
                       <input
                         type="text"
-                        value={profileNim}
-                        onChange={e => setProfileNim(e.target.value)}
+                        value={nimInput}
+                        onChange={e => setNimInput(e.target.value)}
                         required
                         className="w-full bg-[#080d19] border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
                       />
@@ -615,8 +617,8 @@ Ketentuan: correctAnswer berupa index integer 0, 1, 2, atau 3.`;
                       <label className="block text-[11px] text-slate-400 mb-1">Kelas</label>
                       <input
                         type="text"
-                        value={profileClass}
-                        onChange={e => setProfileClass(e.target.value)}
+                        value={classInput}
+                        onChange={e => setClassInput(e.target.value)}
                         className="w-full bg-[#080d19] border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
                       />
                     </div>
@@ -632,9 +634,9 @@ Ketentuan: correctAnswer berupa index integer 0, 1, 2, atau 3.`;
                     </button>
                     <button
                       type="submit"
-                      className="flex-1 py-2 rounded-xl text-xs font-bold bg-cyan-500 text-slate-950 hover:bg-cyan-400 transition shadow-md shadow-cyan-500/20 cursor-pointer"
+                      className="flex-1 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white transition shadow-md shadow-blue-500/20 cursor-pointer flex items-center justify-center gap-1.5"
                     >
-                      Simpan
+                      <span>💾</span> Simpan
                     </button>
                   </div>
                 </form>
@@ -806,7 +808,7 @@ Ketentuan: correctAnswer berupa index integer 0, 1, 2, atau 3.`;
         </div>
       )}
 
-      {/* Modal Detail Mahasiswa */}
+      {/* Modal Detail Jawaban */}
       {selectedStudentDetail && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#0d1527] border border-slate-800 rounded-2xl w-full max-w-xl p-6 max-h-[85vh] flex flex-col text-xs">
