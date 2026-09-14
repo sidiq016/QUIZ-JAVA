@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { getModules, saveModule, deleteModule, getResults } from '../lib/localDb';
-import SidebarDrawer from './SidebarDrawer';
 
 interface Props {
   user: any;
@@ -8,16 +7,37 @@ interface Props {
   onStartProjector: (module: any) => void;
 }
 
+// 10 Karakter Bawaan Asli Proyek
+const AVATARS = [
+  { id: 'av-1', name: 'Karakter 1', icon: '👦' },
+  { id: 'av-2', name: 'Karakter 2', icon: '👧' },
+  { id: 'av-3', name: 'Karakter 3', icon: '👨‍🎓' },
+  { id: 'av-4', name: 'Karakter 4', icon: '👩‍🎓' },
+  { id: 'av-5', name: 'Karakter 5', icon: '🧑‍💼' },
+  { id: 'av-6', name: 'Karakter 6', icon: '👩‍💼' },
+  { id: 'av-7', name: 'Karakter 7', icon: '🧑‍💻' },
+  { id: 'av-8', name: 'Karakter 8', icon: '🧑‍🏫' },
+  { id: 'av-9', name: 'Karakter 9', icon: '🧓' },
+  { id: 'av-10', name: 'Karakter 10', icon: '👵' },
+];
+
 const DashboardAdminDosen: React.FC<Props> = ({ user, onLogout, onStartProjector }) => {
   const [currentUser, setCurrentUser] = useState<any>(() => {
-    const saved = localStorage.getItem('java_quiz_active_user');
-    return saved ? JSON.parse(saved) : (user || { name: 'firman', role: 'dosen', username: '1253040007', nim: '1253040007', class: 'pmh' });
+    try {
+      const saved = localStorage.getItem('java_quiz_active_user');
+      return saved ? JSON.parse(saved) : (user || { name: 'firman', role: 'dosen', nim: '1253040007', class: 'pmh', avatarId: 'av-1' });
+    } catch {
+      return user || { name: 'firman', role: 'dosen', nim: '1253040007', class: 'pmh', avatarId: 'av-1' };
+    }
   });
 
-  const [activeTab, setActiveTab] = useState<'modules' | 'results'>('modules');
-  const [modules, setModules] = useState<any[]>(getModules());
-  const [results, setResults] = useState<any[]>(getResults());
-  
+  const [modules, setModules] = useState<any[]>(() => {
+    try { return getModules() || []; } catch { return []; }
+  });
+  const [results, setResults] = useState<any[]>(() => {
+    try { return getResults() || []; } catch { return []; }
+  });
+
   // State Input Pembuat Kuis AI
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
@@ -26,8 +46,13 @@ const DashboardAdminDosen: React.FC<Props> = ({ user, onLogout, onStartProjector
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Sidebar Drawer (Garis Tiga ☰)
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  // State Drawer Pengaturan
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [profileName, setProfileName] = useState(currentUser?.name || 'firman');
+  const [profileNim, setProfileNim] = useState(currentUser?.nim || '1253040007');
+  const [profileClass, setProfileClass] = useState(currentUser?.class || 'pmh');
+  const [selectedAvatarId, setSelectedAvatarId] = useState(currentUser?.avatarId || 'av-1');
 
   // Modal State
   const [editingModule, setEditingModule] = useState<any | null>(null);
@@ -35,12 +60,26 @@ const DashboardAdminDosen: React.FC<Props> = ({ user, onLogout, onStartProjector
   const [selectedStudentDetail, setSelectedStudentDetail] = useState<any | null>(null);
 
   const refreshData = () => {
-    setModules(getModules());
-    setResults(getResults());
+    try {
+      setModules(getModules() || []);
+      setResults(getResults() || []);
+    } catch (e) {
+      console.error(e);
+    }
   };
 
-  const handleUpdateUser = (updatedData: any) => {
-    setCurrentUser(updatedData);
+  const handleSaveProfile = (e: React.FormEvent) => {
+    e.preventDefault();
+    const updated = {
+      ...currentUser,
+      name: profileName,
+      nim: profileNim,
+      class: profileClass,
+      avatarId: selectedAvatarId
+    };
+    setCurrentUser(updated);
+    localStorage.setItem('java_quiz_active_user', JSON.stringify(updated));
+    setIsEditingProfile(false);
   };
 
   const handleDeleteModule = (id: string) => {
@@ -101,37 +140,14 @@ const DashboardAdminDosen: React.FC<Props> = ({ user, onLogout, onStartProjector
     setViewQuestionsModule({ ...viewQuestionsModule, questions: updatedQuestions });
   };
 
-  const handleQuestionTextChange = (qIndex: number, newText: string) => {
-    if (!viewQuestionsModule) return;
-    const updatedQuestions = [...viewQuestionsModule.questions];
-    updatedQuestions[qIndex].question = newText;
-    setViewQuestionsModule({ ...viewQuestionsModule, questions: updatedQuestions });
-  };
-
-  const handleOptionChange = (qIndex: number, optIndex: number, newText: string) => {
-    if (!viewQuestionsModule) return;
-    const updatedQuestions = [...viewQuestionsModule.questions];
-    updatedQuestions[qIndex].options[optIndex] = newText;
-    setViewQuestionsModule({ ...viewQuestionsModule, questions: updatedQuestions });
-  };
-
   const handleExportExcel = () => {
     if (results.length === 0) {
-      alert('Belum ada data nilai mahasiswa untuk diexport.');
+      alert('Belum ada data nilai mahasiswa.');
       return;
     }
-    const headers = [
-      'Nama Mahasiswa', 'NIM', 'Kelas', 'Modul Kuis', 'Skor Akhir', 
-      'Jawaban Benar', 'Jawaban Salah', 'Nomor Soal Salah', 'Indikasi Nyontek', 'Waktu Selesai'
-    ];
+    const headers = ['Nama Mahasiswa', 'NIM', 'Kelas', 'Modul Kuis', 'Skor Akhir', 'Jawaban Benar', 'Jawaban Salah', 'Nomor Soal Salah', 'Indikasi Nyontek', 'Waktu Selesai'];
     const rows = results.map((r: any) => {
-      let wrongList = '-';
-      if (Array.isArray(r.wrongQuestions) && r.wrongQuestions.length > 0) {
-        wrongList = r.wrongQuestions.join('; ');
-      } else if (Array.isArray(r.answersSummary)) {
-        const wrongs = r.answersSummary.filter((a: any) => !a.isCorrect).map((a: any) => `No.${a.questionNumber}`);
-        wrongList = wrongs.length > 0 ? wrongs.join('; ') : 'Tidak ada';
-      }
+      const wrongList = Array.isArray(r.wrongQuestions) && r.wrongQuestions.length > 0 ? r.wrongQuestions.join('; ') : '-';
       const cheatStatus = (r.tabSwitchCount && r.tabSwitchCount > 0) ? `Terdeteksi (${r.tabSwitchCount}x Pindah Tab)` : (r.cheatingStatus || 'Aman');
       const completedTime = r.completedAt ? new Date(r.completedAt).toLocaleString('id-ID') : (r.timeFinished || '-');
 
@@ -147,7 +163,7 @@ const DashboardAdminDosen: React.FC<Props> = ({ user, onLogout, onStartProjector
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `Hasil_Kuis_Mahasiswa_${Date.now()}.csv`);
+    link.setAttribute('download', `Hasil_Kuis_${Date.now()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -155,7 +171,7 @@ const DashboardAdminDosen: React.FC<Props> = ({ user, onLogout, onStartProjector
 
   const handleUpload = async () => {
     if (!file || !title || !code || !classes) {
-      setError('Harap isi semua field dan pilih file');
+      setError('Harap isi semua field dan pilih file materi');
       return;
     }
     setLoading(true);
@@ -173,8 +189,7 @@ const DashboardAdminDosen: React.FC<Props> = ({ user, onLogout, onStartProjector
       });
 
       const mimeType = file.type || (file.name.endsWith('.pdf') ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-
-      const promptText = `Anda adalah pembuat kuis akademik profesional. Buat 10 soal pilihan ganda dari teks materi dokumen terlampir dalam format JSON Array murni:
+      const promptText = `Anda adalah pembuat kuis akademik. Buat 10 soal pilihan ganda dari teks dokumen terlampir dalam JSON Array murni:
 [
   {
     "question": "pertanyaan",
@@ -182,9 +197,7 @@ const DashboardAdminDosen: React.FC<Props> = ({ user, onLogout, onStartProjector
     "correctAnswer": 0
   }
 ]
-Ketentuan:
-- Gunakan bahasa dan format yang sama persis dengan materi.
-- correctAnswer berupa index integer (0, 1, 2, atau 3).`;
+Ketentuan: correctAnswer berupa index integer 0, 1, 2, atau 3.`;
 
       const availableModels = ['gemini-3.6-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
       let resData: any = null;
@@ -241,7 +254,6 @@ Ketentuan:
       setCode('');
       setClasses('');
       refreshData();
-      setActiveTab('modules');
     } catch (err: any) {
       console.error(err);
       setError(err.message || 'Terjadi kendala pemrosesan AI.');
@@ -250,15 +262,16 @@ Ketentuan:
     }
   };
 
+  const activeAvatar = AVATARS.find(a => a.id === selectedAvatarId) || AVATARS[0];
+
   return (
-    <div className="min-h-screen bg-[#070b14] text-slate-100 flex flex-col font-sans">
-      {/* Topbar Persis Video Asli */}
-      <header className="border-b border-slate-800/80 bg-[#0c1220]/80 backdrop-blur-md px-4 sm:px-8 py-3.5 flex items-center justify-between">
+    <div className="min-h-screen bg-[#070b14] text-slate-100 flex flex-col font-sans select-none">
+      {/* Topbar Persis Akun Mahasiswa */}
+      <header className="border-b border-slate-800/80 bg-[#0c1220]/80 backdrop-blur-md px-6 py-3.5 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          {/* Tombol ☰ yang Membuka SidebarDrawer Asli Proyek */}
           <button
-            onClick={() => setIsSidebarOpen(true)}
-            className="p-2 rounded-xl text-slate-400 hover:text-white transition cursor-pointer"
+            onClick={() => setIsDrawerOpen(true)}
+            className="p-1.5 text-slate-400 hover:text-white transition cursor-pointer"
             title="Pengaturan"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -267,31 +280,28 @@ Ketentuan:
           </button>
 
           <div className="flex items-center gap-2">
+            <span className="text-xl">🚀</span>
             <span className="text-xl font-black tracking-wider text-cyan-400">JAVA'S</span>
-            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">
-              Panel Dosen
-            </span>
           </div>
         </div>
 
         {/* Profil Mini Kanan Atas */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
+          <button className="w-8 h-8 rounded-full bg-slate-900 border border-slate-800 text-slate-400 hover:text-white flex items-center justify-center text-sm">
+            🔔
+          </button>
           <div
-            onClick={() => setIsSidebarOpen(true)}
+            onClick={() => setIsDrawerOpen(true)}
             className="flex items-center gap-2.5 cursor-pointer hover:opacity-80 transition"
           >
             <div className="text-right hidden sm:block">
-              <span className="font-bold text-xs text-white block">{currentUser?.name || 'firman'}</span>
-              <span className="block text-[10px] text-cyan-400 font-medium">
+              <span className="font-bold text-xs text-white block leading-tight">{currentUser?.name || 'firman'}</span>
+              <span className="text-[10px] text-cyan-400 font-medium leading-tight">
                 {currentUser?.role === 'dosen' ? 'Dosen' : 'Mahasiswa'} • {currentUser?.class || 'pmh'}
               </span>
             </div>
-            <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 overflow-hidden flex items-center justify-center text-sm font-bold text-cyan-400">
-              {currentUser?.avatarUrl ? (
-                <img src={currentUser.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
-              ) : (
-                currentUser?.name?.charAt(0)?.toUpperCase() || 'F'
-              )}
+            <div className="w-8 h-8 rounded-full bg-[#0d172a] border border-cyan-500/40 flex items-center justify-center text-base shadow-sm">
+              {activeAvatar.icon}
             </div>
           </div>
           <button
@@ -306,238 +316,335 @@ Ketentuan:
         </div>
       </header>
 
-      {/* Konten Dashboard */}
-      <main className="max-w-6xl mx-auto w-full px-4 py-8 flex-1">
-        <div className="flex justify-center mb-8">
-          <div className="bg-[#0e1628] p-1 rounded-2xl border border-slate-800 flex gap-1">
-            <button
-              onClick={() => setActiveTab('modules')}
-              className={`px-7 py-2 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer ${
-                activeTab === 'modules' ? 'bg-cyan-500 text-slate-950 font-bold shadow-md' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Modul
-            </button>
-            <button
-              onClick={() => setActiveTab('results')}
-              className={`px-7 py-2 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer ${
-                activeTab === 'results' ? 'bg-cyan-500 text-slate-950 font-bold shadow-md' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Hasil
-            </button>
-          </div>
-        </div>
-
-        {activeTab === 'modules' ? (
-          <div>
-            <div className="text-center mb-6">
-              <h1 className="text-2xl font-bold text-white">Manajemen Modul Kuis</h1>
-              <p className="text-xs text-slate-400">Buat kuis baru atau atur modul yang sudah ada.</p>
-            </div>
-
-            {/* Form Generator AI */}
-            <div className="max-w-xl mx-auto bg-[#0d1527]/80 border border-slate-800 rounded-2xl p-6 shadow-xl mb-10">
-              <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-                <span>📄</span> Buat Modul Baru dari Dokumen
-              </h2>
-
-              {error && (
-                <div className="p-3 mb-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs">
-                  {error}
-                </div>
-              )}
-
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] text-slate-400 mb-1">Judul Modul</label>
-                    <input
-                      type="text"
-                      value={title}
-                      onChange={e => setTitle(e.target.value)}
-                      placeholder="Contoh: Fikih Jinayah"
-                      className="w-full bg-[#080d19] border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] text-slate-400 mb-1">Kode Akses Kuis</label>
-                    <input
-                      type="text"
-                      value={code}
-                      onChange={e => setCode(e.target.value)}
-                      placeholder="Contoh: 1528"
-                      className="w-full bg-[#080d19] border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-[11px] text-slate-400 mb-1">Rombel / Kelas (Pisahkan koma)</label>
-                  <input
-                    type="text"
-                    value={classes}
-                    onChange={e => setClasses(e.target.value)}
-                    placeholder="PMH, HES, AS"
-                    className="w-full bg-[#080d19] border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] text-slate-400 mb-1">Dokumen Materi (.pdf / .docx)</label>
-                  <input
-                    type="file"
-                    accept=".pdf,.docx"
-                    onChange={e => setFile(e.target.files?.[0] || null)}
-                    className="w-full text-xs text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:bg-cyan-500/10 file:text-cyan-400 hover:file:bg-cyan-500/20 cursor-pointer"
-                  />
-                </div>
-
-                <button
-                  onClick={handleUpload}
-                  disabled={loading}
-                  className="w-full py-3 rounded-xl font-semibold text-xs text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-90 transition disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  {loading ? 'AI Sedang Memproses...' : '⚡ Generate Soal Kuis (AI)'}
-                </button>
+      {/* Konten 2 Kolom Persis Halaman Mahasiswa */}
+      <main className="max-w-7xl mx-auto w-full px-6 py-6 flex-1 grid lg:grid-cols-12 gap-6">
+        
+        {/* Kolom Kiri: Input Generator & Daftar Modul Tersedia */}
+        <div className="lg:col-span-6 space-y-6">
+          
+          {/* Card Pembuat Kuis Dokumen (Menempati Posisi Masuk ke Ruang Kuis) */}
+          <div className="bg-[#0e1628]/80 border border-slate-800/90 rounded-2xl p-5 shadow-xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-9 h-9 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-lg">
+                🎓
+              </div>
+              <div>
+                <h2 className="text-sm font-bold text-white leading-tight">Buat Modul Kuis (AI)</h2>
+                <p className="text-[11px] text-slate-400 leading-tight">Unggah file dokumen materi untuk generate soal otomatis</p>
               </div>
             </div>
 
-            {/* List Modul Aktif */}
-            <div>
-              <h3 className="text-base font-bold text-white mb-4">Modul Aktif</h3>
-              <div className="grid md:grid-cols-2 gap-4">
+            {error && (
+              <div className="p-2.5 mb-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-[11px]">
+                {error}
+              </div>
+            )}
+
+            <div className="space-y-3 text-xs">
+              <div className="grid grid-cols-2 gap-2.5">
+                <input
+                  type="text"
+                  value={title}
+                  onChange={e => setTitle(e.target.value)}
+                  placeholder="Judul Modul"
+                  className="bg-[#070b14] border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+                />
+                <input
+                  type="text"
+                  value={code}
+                  onChange={e => setCode(e.target.value)}
+                  placeholder="Kode Kuis"
+                  className="bg-[#070b14] border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+
+              <input
+                type="text"
+                value={classes}
+                onChange={e => setClasses(e.target.value)}
+                placeholder="Rombel / Kelas (contoh: PMH 3A, HES)"
+                className="w-full bg-[#070b14] border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+              />
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="file"
+                  accept=".pdf,.docx"
+                  onChange={e => setFile(e.target.files?.[0] || null)}
+                  className="w-full text-[11px] text-slate-400 file:mr-2 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:bg-cyan-500/10 file:text-cyan-400 hover:file:bg-cyan-500/20 cursor-pointer"
+                />
+                <button
+                  onClick={handleUpload}
+                  disabled={loading}
+                  className="px-5 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white transition disabled:opacity-50 whitespace-nowrap cursor-pointer"
+                >
+                  {loading ? 'Proses...' : 'Generate'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Card Daftar Modul Tersedia */}
+          <div className="bg-[#0e1628]/80 border border-slate-800/90 rounded-2xl p-5 shadow-xl">
+            <h3 className="text-xs font-bold text-white mb-3 flex items-center gap-2">
+              <span>📚</span> Daftar Modul Tersedia
+            </h3>
+
+            {modules.length === 0 ? (
+              <div className="p-6 text-center text-slate-500 text-xs">
+                Belum ada modul yang dibuat.
+              </div>
+            ) : (
+              <div className="space-y-2.5">
                 {modules.map(mod => (
-                  <div key={mod.id} className="bg-[#0d1527]/70 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between">
+                  <div
+                    key={mod.id}
+                    className="p-3.5 bg-[#070b14] border border-slate-800/90 rounded-xl flex items-center justify-between"
+                  >
                     <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="px-2.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-xs font-mono font-bold">
+                      <h4 className="text-xs font-bold text-white">{mod.title}</h4>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[10px] text-slate-400">⏱ {mod.questions?.length || 0} Soal</span>
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 font-medium">
                           Kode: {mod.code}
                         </span>
-                        <span className="text-[11px] text-slate-400">{mod.questions?.length || 0} Soal • {mod.settings?.timePerQuestion || 30}s</span>
                       </div>
-                      <h4 className="text-sm font-bold text-white mb-1">{mod.title}</h4>
-                      <p className="text-xs text-slate-400 mb-3">Kelas: {Array.isArray(mod.classes) ? mod.classes.join(', ') : mod.classes}</p>
                     </div>
 
-                    <div className="space-y-2">
+                    <div className="flex items-center gap-1.5">
                       <button
                         onClick={() => onStartProjector(mod)}
-                        className="w-full py-2 rounded-xl bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 text-xs font-semibold border border-emerald-500/30 transition cursor-pointer"
+                        className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 flex items-center justify-center text-xs font-bold transition cursor-pointer"
+                        title="Mulai Proyektor"
                       >
-                        Mulai Proyektor
+                        ▶
                       </button>
-                      <div className="grid grid-cols-3 gap-2">
-                        <button
-                          onClick={() => setViewQuestionsModule(JSON.parse(JSON.stringify(mod)))}
-                          className="py-1.5 rounded-lg bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 text-xs font-medium border border-indigo-500/20 transition cursor-pointer"
-                        >
-                          📝 Kunci
-                        </button>
-                        <button
-                          onClick={() => openEditModal(mod)}
-                          className="py-1.5 rounded-lg bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 text-xs font-medium border border-cyan-500/20 transition cursor-pointer"
-                        >
-                          ⚙️ Atur
-                        </button>
-                        <button
-                          onClick={() => handleDeleteModule(mod.id)}
-                          className="py-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 text-xs font-medium border border-red-500/20 transition cursor-pointer"
-                        >
-                          Hapus
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => setViewQuestionsModule(JSON.parse(JSON.stringify(mod)))}
+                        className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 flex items-center justify-center text-xs transition cursor-pointer"
+                        title="Kunci Jawaban"
+                      >
+                        📝
+                      </button>
+                      <button
+                        onClick={() => openEditModal(mod)}
+                        className="w-8 h-8 rounded-lg bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 flex items-center justify-center text-xs transition cursor-pointer"
+                        title="Atur Pengaturan"
+                      >
+                        ⚙️
+                      </button>
+                      <button
+                        onClick={() => handleDeleteModule(mod.id)}
+                        className="w-8 h-8 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 flex items-center justify-center text-xs transition cursor-pointer"
+                        title="Hapus"
+                      >
+                        ✕
+                      </button>
                     </div>
                   </div>
                 ))}
               </div>
-            </div>
+            )}
           </div>
-        ) : (
-          /* Tab Hasil */
-          <div>
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h1 className="text-xl font-bold text-white">Hasil & Nilai Mahasiswa</h1>
-                <p className="text-xs text-slate-400">Daftar rekapan hasil pengerjaan kuis.</p>
-              </div>
+        </div>
+
+        {/* Kolom Kanan: Rekap Hasil & Nilai (Menempati Posisi Riwayat Kuis Saya) */}
+        <div className="lg:col-span-6">
+          <div className="bg-[#0e1628]/80 border border-slate-800/90 rounded-2xl p-5 shadow-xl h-full flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xs font-bold text-white flex items-center gap-2">
+                <span>📋</span> Rekap Nilai Mahasiswa
+              </h3>
               <button
                 onClick={handleExportExcel}
-                className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-2 shadow-md transition cursor-pointer"
+                className="px-3 py-1 rounded-lg text-[11px] font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition cursor-pointer flex items-center gap-1.5"
               >
-                <span>📊</span> Export Excel / CSV
+                <span>📊</span> Export CSV
               </button>
             </div>
 
-            <div className="overflow-x-auto bg-[#0d1527] border border-slate-800 rounded-2xl">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-[#080d19] text-slate-400 uppercase border-b border-slate-800">
-                  <tr>
-                    <th className="py-3 px-4">Nama Mahasiswa</th>
-                    <th className="py-3 px-3">NIM</th>
-                    <th className="py-3 px-3">Kelas</th>
-                    <th className="py-3 px-3 text-center">Skor</th>
-                    <th className="py-3 px-3 text-center">Benar/Salah</th>
-                    <th className="py-3 px-3 text-center">Salah di No.</th>
-                    <th className="py-3 px-3 text-center">Nyontek</th>
-                    <th className="py-3 px-4 text-right">Waktu</th>
-                    <th className="py-3 px-3 text-center">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800">
-                  {results.map((res: any, idx: number) => (
-                    <tr key={idx} className="hover:bg-slate-800/30">
-                      <td className="py-3 px-4 font-semibold text-white">{res.studentName || res.name || '-'}</td>
-                      <td className="py-3 px-3 text-slate-400">{res.nim || '-'}</td>
-                      <td className="py-3 px-3 text-slate-400">{res.className || '-'}</td>
-                      <td className="py-3 px-3 text-center font-bold text-cyan-400">{res.score ?? 0}</td>
-                      <td className="py-3 px-3 text-center">
-                        <span className="text-emerald-400">{res.correctAnswers ?? 0}</span> / <span className="text-red-400">{res.wrongAnswers ?? 0}</span>
-                      </td>
-                      <td className="py-3 px-3 text-center text-red-400 font-mono">
-                        {Array.isArray(res.wrongQuestions) && res.wrongQuestions.length > 0 ? res.wrongQuestions.join(', ') : '-'}
-                      </td>
-                      <td className="py-3 px-3 text-center">
+            {results.length === 0 ? (
+              <div className="flex-1 flex items-center justify-center text-slate-500 text-xs py-12">
+                Belum ada mahasiswa yang menyelesaikan kuis.
+              </div>
+            ) : (
+              <div className="overflow-y-auto space-y-2 flex-1 max-h-[600px] pr-1 text-xs">
+                {results.map((res: any, idx: number) => (
+                  <div
+                    key={idx}
+                    className="p-3 bg-[#070b14] border border-slate-800/90 rounded-xl flex items-center justify-between"
+                  >
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-white">{res.studentName || res.name || '-'}</span>
+                        <span className="text-[10px] text-slate-400 font-mono">({res.nim || '-'})</span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-1 text-[11px]">
+                        <span className="text-slate-400">Kelas: {res.className || '-'}</span>
+                        <span className="text-slate-600">•</span>
+                        <span className="text-emerald-400 font-semibold">{res.correctAnswers ?? 0} Benar</span>
+                        <span className="text-slate-600">•</span>
+                        <span className="text-red-400 font-semibold">{res.wrongAnswers ?? 0} Salah</span>
                         {res.tabSwitchCount ? (
-                          <span className="px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20 text-[10px]">
+                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-red-500/10 text-red-400">
                             {res.tabSwitchCount}x Tab
                           </span>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px]">
-                            Aman
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-3 px-4 text-right text-slate-400 text-[11px]">
-                        {res.completedAt ? new Date(res.completedAt).toLocaleTimeString('id-ID') : '-'}
-                      </td>
-                      <td className="py-3 px-3 text-center">
-                        <button
-                          onClick={() => setSelectedStudentDetail(res)}
-                          className="px-2 py-1 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-[11px] hover:bg-cyan-500/20 transition cursor-pointer"
-                        >
-                          🔍 Periksa
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <span className="text-base font-black text-cyan-400">{res.score ?? 0}</span>
+                      <button
+                        onClick={() => setSelectedStudentDetail(res)}
+                        className="px-2.5 py-1 rounded-lg bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 text-[11px] font-semibold border border-cyan-500/20 transition cursor-pointer"
+                      >
+                        Periksa
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        )}
+        </div>
+
       </main>
 
-      {/* Memanggil Komponen SidebarDrawer Asli Proyek */}
-      <SidebarDrawer
-        isOpen={isSidebarOpen}
-        onClose={() => setIsSidebarOpen(false)}
-        currentUser={currentUser}
-        onUpdateUser={handleUpdateUser}
-        onLogout={onLogout}
-      />
+      {/* Footer Hak Cipta Persis Video */}
+      <footer className="text-center py-4 text-[10px] text-slate-600 tracking-wider">
+        © PROPERTY BY JAWA X JAVA'S STUDIOS COMPANY
+      </footer>
 
-      {/* Modal Edit Pengaturan Modul */}
+      {/* DRAWER PENGATURAN KIRI PERSIS VIDEO */}
+      {isDrawerOpen && (
+        <div className="fixed inset-0 z-50 flex">
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setIsDrawerOpen(false)}
+          />
+          <div className="relative w-80 max-w-[85vw] bg-[#0c1424] border-r border-slate-800 text-slate-100 flex flex-col h-full shadow-2xl z-10 animate-in slide-in-from-left duration-300">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800/80">
+              <div className="flex items-center gap-2.5">
+                <span className="text-cyan-400 text-lg">⚙️</span>
+                <span className="font-bold text-sm tracking-wide text-white">Pengaturan</span>
+              </div>
+              <button
+                onClick={() => setIsDrawerOpen(false)}
+                className="text-slate-400 hover:text-white text-lg p-1 transition cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-5">
+              <div className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider mb-4 flex items-center gap-1.5">
+                <span>👤</span> PROFIL & KARAKTER
+              </div>
+
+              {!isEditingProfile ? (
+                /* Card Profil Tersimpan (Sesuai Video) */
+                <div className="bg-[#111c33] border border-slate-800/90 rounded-2xl p-5 text-center shadow-lg">
+                  <div className="w-20 h-20 mx-auto mb-3 rounded-full bg-[#080d19] border-2 border-cyan-400 flex items-center justify-center text-4xl shadow-md shadow-cyan-500/20">
+                    {activeAvatar.icon}
+                  </div>
+                  <h3 className="font-bold text-base text-white">{currentUser?.name || 'firman'}</h3>
+                  <p className="text-xs text-slate-400 capitalize">{currentUser?.role || 'Dosen'}</p>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    NIM: {currentUser?.nim || '1253040007'} • Kelas: {currentUser?.class || 'pmh'}
+                  </p>
+
+                  <button
+                    onClick={() => setIsEditingProfile(true)}
+                    className="mt-5 w-full py-2 rounded-xl text-xs font-semibold bg-cyan-500/15 text-cyan-400 hover:bg-cyan-500/25 border border-cyan-500/30 transition cursor-pointer"
+                  >
+                    Edit Profil
+                  </button>
+                </div>
+              ) : (
+                /* Form Edit Karakter & Biodata */
+                <form onSubmit={handleSaveProfile} className="space-y-4">
+                  <div className="flex justify-center">
+                    <div className="w-20 h-20 rounded-full bg-[#080d19] border-2 border-cyan-400 flex items-center justify-center text-4xl shadow-lg shadow-cyan-500/25">
+                      {activeAvatar.icon}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] text-slate-400 mb-1.5 font-medium">Pilih Karakter:</label>
+                    <div className="grid grid-cols-5 gap-1.5 bg-[#080d19] p-2 rounded-xl border border-slate-800">
+                      {AVATARS.map((av) => (
+                        <button
+                          type="button"
+                          key={av.id}
+                          onClick={() => setSelectedAvatarId(av.id)}
+                          className={`h-9 rounded-lg flex items-center justify-center text-xl transition-all cursor-pointer ${
+                            selectedAvatarId === av.id
+                              ? 'bg-cyan-500/30 border border-cyan-400 scale-105 shadow-sm shadow-cyan-400'
+                              : 'bg-slate-800/40 hover:bg-slate-800 border border-transparent'
+                          }`}
+                        >
+                          {av.icon}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 pt-1 text-xs">
+                    <div>
+                      <label className="block text-[11px] text-slate-400 mb-1">Nama</label>
+                      <input
+                        type="text"
+                        value={profileName}
+                        onChange={e => setProfileName(e.target.value)}
+                        required
+                        className="w-full bg-[#080d19] border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] text-slate-400 mb-1">NIM</label>
+                      <input
+                        type="text"
+                        value={profileNim}
+                        onChange={e => setProfileNim(e.target.value)}
+                        required
+                        className="w-full bg-[#080d19] border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] text-slate-400 mb-1">Kelas</label>
+                      <input
+                        type="text"
+                        value={profileClass}
+                        onChange={e => setProfileClass(e.target.value)}
+                        className="w-full bg-[#080d19] border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingProfile(false)}
+                      className="flex-1 py-2 rounded-xl text-xs bg-slate-800 text-slate-300 hover:bg-slate-700 transition cursor-pointer"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      type="submit"
+                      className="flex-1 py-2 rounded-xl text-xs font-bold bg-cyan-500 text-slate-950 hover:bg-cyan-400 transition shadow-md shadow-cyan-500/20 cursor-pointer"
+                    >
+                      Simpan
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Edit Modul */}
       {editingModule && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#0d1527] border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl">
@@ -628,7 +735,7 @@ Ketentuan:
         </div>
       )}
 
-      {/* Modal Bank Soal / Ubah Kunci */}
+      {/* Modal Bank Soal */}
       {viewQuestionsModule && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#0d1527] border border-slate-800 rounded-2xl w-full max-w-2xl p-6 max-h-[85vh] flex flex-col">
@@ -646,7 +753,11 @@ Ketentuan:
                     <input
                       type="text"
                       value={q.question}
-                      onChange={e => handleQuestionTextChange(qIdx, e.target.value)}
+                      onChange={e => {
+                        const qs = [...viewQuestionsModule.questions];
+                        qs[qIdx].question = e.target.value;
+                        setViewQuestionsModule({ ...viewQuestionsModule, questions: qs });
+                      }}
                       className="flex-1 bg-slate-900 border border-slate-800 rounded px-2 py-1 text-white"
                     />
                   </div>
@@ -658,13 +769,17 @@ Ketentuan:
                           name={`ans-${qIdx}`}
                           checked={q.correctAnswer === optIdx}
                           onChange={() => handleCorrectAnswerChange(qIdx, optIdx)}
-                          className="accent-emerald-500"
+                          className="accent-emerald-500 cursor-pointer"
                         />
                         <span className="w-4 font-bold text-slate-400">{String.fromCharCode(65 + optIdx)}.</span>
                         <input
                           type="text"
                           value={opt}
-                          onChange={e => handleOptionChange(qIdx, optIdx, e.target.value)}
+                          onChange={e => {
+                            const qs = [...viewQuestionsModule.questions];
+                            qs[qIdx].options[optIdx] = e.target.value;
+                            setViewQuestionsModule({ ...viewQuestionsModule, questions: qs });
+                          }}
                           className="flex-1 bg-transparent text-white border-b border-slate-800 focus:border-cyan-500 px-1 py-0.5"
                         />
                       </div>
