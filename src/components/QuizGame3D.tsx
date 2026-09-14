@@ -5,7 +5,6 @@ import confetti from 'canvas-confetti';
 import { LogOut, CheckCircle, XCircle, AlertTriangle, Clock, Activity, ChevronRight, Award } from 'lucide-react';
 import { saveResult } from '../lib/localDb';
 
-
 interface Props {
   user: User;
   module: QuizModule;
@@ -19,7 +18,13 @@ export default function QuizGame3D({ user, module, onExit }: Props) {
   const [isFinished, setIsFinished] = useState(false);
   const [timeLeft, setTimeLeft] = useState(module.settings.timePerQuestion);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
-  const [answerDetails, setAnswerDetails] = useState<{ questionIdx: number, selectedIdx: number, correctIdx: number }[]>([]);
+  const [answerDetails, setAnswerDetails] = useState<{ 
+    questionIdx: number; 
+    selectedIdx: number; 
+    correctIdx: number;
+    questionText: string;
+    options: string[];
+  }[]>([]);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   
   // Anti-cheat
@@ -70,7 +75,9 @@ export default function QuizGame3D({ user, module, onExit }: Props) {
     setAnswerDetails(prev => [...prev, {
       questionIdx: currentIndex,
       selectedIdx,
-      correctIdx: currentQ.correctAnswer
+      correctIdx: currentQ.correctAnswer,
+      questionText: currentQ.question,
+      options: currentQ.options
     }]);
 
     if (isCorrect) {
@@ -108,7 +115,9 @@ export default function QuizGame3D({ user, module, onExit }: Props) {
       
       const resultId = crypto.randomUUID();
       const resultData = {
+          id: resultId,
           quizId: module.id,
+          moduleId: module.id, // Kunci sinkronisasi dengan Dasbor Dosen & Admin
           studentId: user.id,
           studentName: user.name,
           studentNim: user.nim,
@@ -121,8 +130,7 @@ export default function QuizGame3D({ user, module, onExit }: Props) {
           details: answerDetails
       };
       
-      saveResult({ ...resultData, id: resultId } as any)
-        
+      saveResult(resultData as any);
     }
   }, [isFinished, correctCount, wrongCount, activeQuestions.length, user, module.id, answerDetails, module.settings.pointsCorrect, module.settings.pointsWrong]);
 
@@ -145,7 +153,7 @@ export default function QuizGame3D({ user, module, onExit }: Props) {
           </div>
           
           <h1 className="text-4xl font-black text-white mb-2 tracking-tight">Kuis Selesai! 🎉</h1>
-          <p className="text-slate-400 font-medium mb-8">Kerja bagus, {user.name.split(' ')[0]}!</p>
+          <p className="text-slate-400 font-medium mb-8">Kerja bagus, {user.name ? user.name.split(' ')[0] : ''}!</p>
           
           <div className="bg-black/40 rounded-3xl p-8 mb-8 border border-white/5">
             <div className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-2">Skor Akhir</div>
