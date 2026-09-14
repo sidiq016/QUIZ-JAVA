@@ -19,6 +19,8 @@ const DashboardAdminDosen: React.FC<Props> = ({ user, onLogout, onStartProjector
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const [editingModule, setEditingModule] = useState<any | null>(null);
+
   const refreshData = () => {
     setModules(getModules());
     setResults(getResults());
@@ -29,6 +31,102 @@ const DashboardAdminDosen: React.FC<Props> = ({ user, onLogout, onStartProjector
       deleteModule(id);
       refreshData();
     }
+  };
+
+  const openEditModal = (mod: any) => {
+    setEditingModule({
+      ...mod,
+      classesStr: Array.isArray(mod.classes) ? mod.classes.join(', ') : (mod.classes || ''),
+      settings: {
+        questionCount: mod.settings?.questionCount ?? mod.questions?.length ?? 10,
+        timePerQuestion: mod.settings?.timePerQuestion ?? 30,
+        pointsCorrect: mod.settings?.pointsCorrect ?? 10,
+        pointsWrong: mod.settings?.pointsWrong ?? 0,
+        pointsUnanswered: mod.settings?.pointsUnanswered ?? 0,
+        projectorMode: mod.settings?.projectorMode ?? false
+      }
+    });
+  };
+
+  const handleSaveEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingModule) return;
+
+    const updatedModule = {
+      ...editingModule,
+      classes: editingModule.classesStr.split(',').map((c: string) => c.trim()).filter(Boolean),
+      settings: {
+        ...editingModule.settings,
+        questionCount: Number(editingModule.settings.questionCount),
+        timePerQuestion: Number(editingModule.settings.timePerQuestion),
+        pointsCorrect: Number(editingModule.settings.pointsCorrect),
+        pointsWrong: Number(editingModule.settings.pointsWrong),
+        pointsUnanswered: Number(editingModule.settings.pointsUnanswered)
+      }
+    };
+    delete updatedModule.classesStr;
+
+    saveModule(updatedModule);
+    setEditingModule(null);
+    refreshData();
+  };
+
+  // Export data hasil ke format CSV/Excel
+  const handleExportExcel = () => {
+    if (results.length === 0) {
+      alert('Belum ada data pengerjaan mahasiswa untuk diexport.');
+      return;
+    }
+
+    const headers = [
+      'Nama Mahasiswa',
+      'NIM',
+      'Kelas',
+      'Modul Kuis',
+      'Skor Akhir',
+      'Jawaban Benar',
+      'Jawaban Salah',
+      'Nomor Soal Salah',
+      'Indikasi Nyontek',
+      'Waktu Selesai'
+    ];
+
+    const rows = results.map((r: any) => {
+      const wrongList = Array.isArray(r.wrongQuestions) && r.wrongQuestions.length > 0 
+        ? r.wrongQuestions.join('; ') 
+        : (r.wrongQuestionIndices ? r.wrongQuestionIndices.map((n: number) => `No.${n + 1}`).join('; ') : '-');
+      
+      const cheatStatus = r.tabSwitchCount > 0 
+        ? `Terdeteksi (${r.tabSwitchCount}x Pindah Tab)` 
+        : (r.cheatingStatus || 'Aman');
+
+      const completedTime = r.completedAt 
+        ? new Date(r.completedAt).toLocaleString('id-ID') 
+        : (r.timeFinished || '-');
+
+      return [
+        `"${r.studentName || '-'}"`,
+        `"${r.nim || '-'}"`,
+        `"${r.className || '-'}"`,
+        `"${r.moduleTitle || '-'}"`,
+        r.score ?? 0,
+        r.correctAnswers ?? 0,
+        r.wrongAnswers ?? (r.totalQuestions ? r.totalQuestions - (r.correctAnswers || 0) : 0),
+        `"${wrongList}"`,
+        `"${cheatStatus}"`,
+        `"${completedTime}"`
+      ];
+    });
+
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `Hasil_Kuis_Mahasiswa_${Date.now()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleUpload = async () => {
@@ -69,7 +167,6 @@ Ketentuan:
 - Gunakan bahasa dan aksara yang persis sama dengan materi.
 - correctAnswer berupa index integer (0, 1, 2, atau 3).`;
 
-      // Daftar model yang akan dicoba secara berurutan
       const availableModels = ['gemini-3.6-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
       let resData: any = null;
       let lastErrorMessage = '';
@@ -127,7 +224,8 @@ Ketentuan:
           timePerQuestion: 30,
           projectorMode: false,
           pointsCorrect: 10,
-          pointsWrong: 0
+          pointsWrong: 0,
+          pointsUnanswered: 0
         },
         createdBy: user?.name || user?.username || 'Dosen',
         createdAt: Date.now()
@@ -150,6 +248,7 @@ Ketentuan:
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-6">
+      {/* Header */}
       <div className="max-w-6xl mx-auto flex items-center justify-between border-b border-slate-800 pb-4 mb-8">
         <div className="flex items-center gap-3">
           <span className="text-xl font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-500">
@@ -172,6 +271,7 @@ Ketentuan:
       </div>
 
       <div className="max-w-6xl mx-auto">
+        {/* Navigation Tabs */}
         <div className="flex justify-center mb-8">
           <div className="bg-slate-900 border border-slate-800 p-1 rounded-xl flex gap-1">
             <button
@@ -200,6 +300,7 @@ Ketentuan:
               <p className="text-sm text-slate-400">Buat kuis baru atau atur modul yang sudah ada.</p>
             </div>
 
+            {/* Form Upload Dokumen AI */}
             <div className="max-w-xl mx-auto bg-slate-900/60 border border-slate-800/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl mb-12">
               <h2 className="text-base font-semibold text-white mb-4 flex items-center gap-2">
                 <span>📄</span> Buat Modul Baru dari Dokumen
@@ -266,6 +367,7 @@ Ketentuan:
               </div>
             </div>
 
+            {/* Daftar Modul */}
             <div>
               <h3 className="text-lg font-bold text-white mb-4">Modul Aktif</h3>
               {modules.length === 0 ? (
@@ -281,10 +383,20 @@ Ketentuan:
                           <span className="px-2.5 py-1 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-xs font-semibold">
                             Kode: {mod.code}
                           </span>
-                          <span className="text-xs text-slate-400">{mod.questions?.length || 0} Soal</span>
+                          <span className="text-xs text-slate-400">
+                            {mod.settings?.questionCount || mod.questions?.length || 0} Soal • {mod.settings?.timePerQuestion || 30}s/soal
+                          </span>
                         </div>
                         <h4 className="text-base font-semibold text-white mb-1">{mod.title}</h4>
-                        <p className="text-xs text-slate-400">Kelas: {mod.classes?.join(', ')}</p>
+                        <p className="text-xs text-slate-400 mb-2">Kelas: {Array.isArray(mod.classes) ? mod.classes.join(', ') : mod.classes}</p>
+                        
+                        <div className="flex flex-wrap gap-2 text-[11px] text-slate-400 bg-slate-950/40 p-2.5 rounded-lg border border-slate-800/60">
+                          <span className="text-emerald-400 font-medium">+{mod.settings?.pointsCorrect ?? 10} Benar</span>
+                          <span>•</span>
+                          <span className="text-red-400 font-medium">-{Math.abs(mod.settings?.pointsWrong ?? 0)} Salah</span>
+                          <span>•</span>
+                          <span className="text-amber-400 font-medium">{mod.settings?.pointsUnanswered ?? 0} Kosong</span>
+                        </div>
                       </div>
 
                       <div className="flex items-center gap-2 mt-5">
@@ -293,6 +405,12 @@ Ketentuan:
                           className="flex-1 py-2 rounded-lg bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 text-xs font-semibold transition border border-emerald-500/30"
                         >
                           Mulai Proyektor
+                        </button>
+                        <button
+                          onClick={() => openEditModal(mod)}
+                          className="px-3 py-2 rounded-lg bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 text-xs font-semibold transition border border-cyan-500/20"
+                        >
+                          ✏️ Edit
                         </button>
                         <button
                           onClick={() => handleDeleteModule(mod.id)}
@@ -308,10 +426,19 @@ Ketentuan:
             </div>
           </div>
         ) : (
+          /* TAB HASIL DENGAN FITUR EXPORT EXCEL */
           <div>
-            <div className="text-center mb-8">
-              <h1 className="text-2xl font-bold text-white mb-1">Hasil & Nilai Mahasiswa</h1>
-              <p className="text-sm text-slate-400">Daftar rekapan hasil pengerjaan kuis.</p>
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8">
+              <div>
+                <h1 className="text-2xl font-bold text-white mb-1">Hasil & Nilai Mahasiswa</h1>
+                <p className="text-sm text-slate-400">Daftar rekapan hasil dan analisis pengerjaan kuis.</p>
+              </div>
+              <button
+                onClick={handleExportExcel}
+                className="px-5 py-2.5 rounded-xl text-sm font-semibold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-2 shadow-lg shadow-emerald-600/20 transition cursor-pointer"
+              >
+                <span>📊</span> Export Excel / CSV
+              </button>
             </div>
 
             {results.length === 0 ? (
@@ -319,31 +446,61 @@ Ketentuan:
                 Belum ada mahasiswa yang menyelesaikan kuis.
               </div>
             ) : (
-              <div className="overflow-x-auto bg-slate-900/60 border border-slate-800 rounded-xl">
+              <div className="overflow-x-auto bg-slate-900/60 border border-slate-800 rounded-xl shadow-xl">
                 <table className="w-full text-left text-sm">
                   <thead className="bg-slate-950/80 text-xs text-slate-400 uppercase tracking-wider border-b border-slate-800">
                     <tr>
-                      <th className="py-3.5 px-4">Nama</th>
+                      <th className="py-3.5 px-4">Nama Mahasiswa</th>
                       <th className="py-3.5 px-4">NIM</th>
                       <th className="py-3.5 px-4">Kelas</th>
-                      <th className="py-3.5 px-4">Modul</th>
-                      <th className="py-3.5 px-4 text-center">Benar</th>
-                      <th className="py-3.5 px-4 text-right">Skor Akhir</th>
+                      <th className="py-3.5 px-4 text-center">Skor</th>
+                      <th className="py-3.5 px-4 text-center">Benar / Salah</th>
+                      <th className="py-3.5 px-4 text-center">Salah di No.</th>
+                      <th className="py-3.5 px-4 text-center">Indikasi Nyontek</th>
+                      <th className="py-3.5 px-4 text-right">Waktu Selesai</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800">
-                    {results.map((res: any, idx: number) => (
-                      <tr key={idx} className="hover:bg-slate-800/30">
-                        <td className="py-3 px-4 font-medium text-white">{res.studentName}</td>
-                        <td className="py-3 px-4 text-slate-400 text-xs">{res.nim}</td>
-                        <td className="py-3 px-4 text-slate-400 text-xs">{res.className}</td>
-                        <td className="py-3 px-4 text-slate-300">{res.moduleTitle || '-'}</td>
-                        <td className="py-3 px-4 text-center text-slate-300">
-                          {res.correctAnswers} / {res.totalQuestions}
-                        </td>
-                        <td className="py-3 px-4 text-right font-bold text-emerald-400">{res.score}</td>
-                      </tr>
-                    ))}
+                    {results.map((res: any, idx: number) => {
+                      const wrongList = Array.isArray(res.wrongQuestions) && res.wrongQuestions.length > 0
+                        ? res.wrongQuestions.join(', ')
+                        : (res.wrongQuestionIndices ? res.wrongQuestionIndices.map((n: number) => `No.${n + 1}`).join(', ') : '-');
+                      
+                      const isCheating = (res.tabSwitchCount && res.tabSwitchCount > 0) || res.cheatingStatus === 'Nyontek';
+
+                      return (
+                        <tr key={idx} className="hover:bg-slate-800/30 transition">
+                          <td className="py-3 px-4 font-medium text-white">{res.studentName}</td>
+                          <td className="py-3 px-4 text-slate-400 text-xs">{res.nim}</td>
+                          <td className="py-3 px-4 text-slate-400 text-xs">{res.className}</td>
+                          <td className="py-3 px-4 text-center font-bold text-cyan-400">{res.score}</td>
+                          <td className="py-3 px-4 text-center text-xs">
+                            <span className="text-emerald-400 font-semibold">{res.correctAnswers}</span>
+                            <span className="text-slate-500"> / </span>
+                            <span className="text-red-400 font-semibold">
+                              {res.wrongAnswers ?? (res.totalQuestions ? res.totalQuestions - res.correctAnswers : 0)}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-center text-xs text-red-400/90 font-mono">
+                            {wrongList}
+                          </td>
+                          <td className="py-3 px-4 text-center text-xs">
+                            {isCheating ? (
+                              <span className="px-2.5 py-1 rounded bg-red-500/10 text-red-400 border border-red-500/20 font-semibold">
+                                {res.tabSwitchCount ? `${res.tabSwitchCount}x Keluar Tab` : 'Terindikasi'}
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold">
+                                Aman
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-right text-xs text-slate-400">
+                            {res.completedAt ? new Date(res.completedAt).toLocaleString('id-ID') : (res.timeFinished || '-')}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -351,6 +508,154 @@ Ketentuan:
           </div>
         )}
       </div>
+
+      {/* Modal Edit Modul */}
+      {editingModule && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl my-8">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-800 mb-5">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <span>⚙️</span> Edit Modul & Pengaturan Kuis
+              </h3>
+              <button
+                onClick={() => setEditingModule(null)}
+                className="text-slate-400 hover:text-white text-lg font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Judul Modul</label>
+                  <input
+                    type="text"
+                    value={editingModule.title}
+                    onChange={e => setEditingModule({ ...editingModule, title: e.target.value })}
+                    required
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Kode Verifikasi Ruang</label>
+                  <input
+                    type="text"
+                    value={editingModule.code}
+                    onChange={e => setEditingModule({ ...editingModule, code: e.target.value })}
+                    required
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">Rombel / Kelas (Pisahkan koma)</label>
+                <input
+                  type="text"
+                  value={editingModule.classesStr}
+                  onChange={e => setEditingModule({ ...editingModule, classesStr: e.target.value })}
+                  placeholder="PMH, HES, AS"
+                  required
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+
+              <div className="p-4 bg-slate-950/70 border border-slate-800/80 rounded-xl space-y-3">
+                <h4 className="text-xs font-semibold text-cyan-400 uppercase tracking-wider">Aturan Poin & Soal</h4>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">
+                      Jumlah Soal <span className="text-slate-500">(Maks {editingModule.questions?.length || 0})</span>
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={editingModule.questions?.length || 50}
+                      value={editingModule.settings.questionCount}
+                      onChange={e => setEditingModule({
+                        ...editingModule,
+                        settings: { ...editingModule.settings, questionCount: e.target.value }
+                      })}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-cyan-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">Waktu Jawab (Detik/Soal)</label>
+                    <input
+                      type="number"
+                      min={5}
+                      step={5}
+                      value={editingModule.settings.timePerQuestion}
+                      onChange={e => setEditingModule({
+                        ...editingModule,
+                        settings: { ...editingModule.settings, timePerQuestion: e.target.value }
+                      })}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-cyan-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3 pt-1">
+                  <div>
+                    <label className="block text-xs text-emerald-400 mb-1">Poin Benar (+)</label>
+                    <input
+                      type="number"
+                      value={editingModule.settings.pointsCorrect}
+                      onChange={e => setEditingModule({
+                        ...editingModule,
+                        settings: { ...editingModule.settings, pointsCorrect: e.target.value }
+                      })}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-red-400 mb-1">Poin Salah (-)</label>
+                    <input
+                      type="number"
+                      value={editingModule.settings.pointsWrong}
+                      onChange={e => setEditingModule({
+                        ...editingModule,
+                        settings: { ...editingModule.settings, pointsWrong: e.target.value }
+                      })}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-red-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-amber-400 mb-1">Poin Kosong (0)</label>
+                    <input
+                      type="number"
+                      value={editingModule.settings.pointsUnanswered}
+                      onChange={e => setEditingModule({
+                        ...editingModule,
+                        settings: { ...editingModule.settings, pointsUnanswered: e.target.value }
+                      })}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setEditingModule(null)}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-cyan-500 hover:bg-cyan-600 text-slate-950 transition shadow-lg shadow-cyan-500/20"
+                >
+                  Simpan Perubahan
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
