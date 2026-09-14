@@ -1,4 +1,38 @@
-const handleUpload = async () => {
+import React, { useState } from 'react';
+import { getModules, saveModule, deleteModule, getResults } from '../lib/localDb';
+
+interface Props {
+  user: any;
+  onLogout: () => void;
+  onStartProjector: (module: any) => void;
+}
+
+const DashboardAdminDosen: React.FC<Props> = ({ user, onLogout, onStartProjector }) => {
+  const [activeTab, setActiveTab] = useState<'modules' | 'results'>('modules');
+  const [modules, setModules] = useState<any[]>(getModules());
+  const [results, setResults] = useState<any[]>(getResults());
+  
+  // State form upload dokumen AI
+  const [file, setFile] = useState<File | null>(null);
+  const [title, setTitle] = useState('');
+  const [code, setCode] = useState('');
+  const [classes, setClasses] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const refreshData = () => {
+    setModules(getModules());
+    setResults(getResults());
+  };
+
+  const handleDeleteModule = (id: string) => {
+    if (window.confirm('Hapus modul kuis ini?')) {
+      deleteModule(id);
+      refreshData();
+    }
+  };
+
+  const handleUpload = async () => {
     if (!file || !title || !code || !classes) {
       setError('Harap isi semua field dan pilih file');
       return;
@@ -21,7 +55,7 @@ const handleUpload = async () => {
           const result = reader.result as string;
           resolve(result.split(',')[1]);
         };
-        reader.onerror = error => reject(error);
+        reader.onerror = err => reject(err);
       });
 
       const mimeType = file.type || (file.name.endsWith('.pdf') ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
@@ -38,7 +72,7 @@ Format jawaban HARUS berupa JSON Array murni tanpa format markdown seperti conto
   }
 ]
 Ketentuan:
-- Gunakan bahasa yang sama dengan dokumen materi.
+- Gunakan bahasa dan aksara yang sama persis dengan dokumen materi sumber.
 - correctAnswer berupa angka index (0 untuk A, 1 untuk B, 2 untuk C, 3 untuk D).`;
 
       // 4. Kirim langsung ke Google AI Studio (Gemini 2.5 Flash)
@@ -92,7 +126,7 @@ Ketentuan:
           pointsCorrect: 10,
           pointsWrong: 0
         },
-        createdBy: user.name || user.username || 'Dosen',
+        createdBy: user?.name || user?.username || 'Dosen',
         createdAt: Date.now()
       };
 
@@ -101,6 +135,7 @@ Ketentuan:
       setTitle('');
       setCode('');
       setClasses('');
+      refreshData();
       setActiveTab('modules');
     } catch (err: any) {
       console.error(err);
@@ -109,3 +144,221 @@ Ketentuan:
       setLoading(false);
     }
   };
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100 p-6">
+      {/* Header */}
+      <div className="max-w-6xl mx-auto flex items-center justify-between border-b border-slate-800 pb-4 mb-8">
+        <div className="flex items-center gap-3">
+          <span className="text-xl font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-500">
+            JAVA'S
+          </span>
+          <span className="text-sm font-medium text-slate-400">Panel Dosen</span>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="text-right text-xs">
+            <span className="block text-slate-400">DOSEN</span>
+            <span className="font-semibold text-emerald-400">{user?.name || 'Firman'}</span>
+          </div>
+          <button
+            onClick={onLogout}
+            className="px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 text-xs transition border border-red-500/20"
+          >
+            Keluar
+          </button>
+        </div>
+      </div>
+
+      <div className="max-w-6xl mx-auto">
+        {/* Navigation Tabs */}
+        <div className="flex justify-center mb-8">
+          <div className="bg-slate-900 border border-slate-800 p-1 rounded-xl flex gap-1">
+            <button
+              onClick={() => setActiveTab('modules')}
+              className={`px-6 py-2 rounded-lg text-sm font-semibold transition ${
+                activeTab === 'modules'
+                  ? 'bg-slate-800 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Modul
+            </button>
+            <button
+              onClick={() => setActiveTab('results')}
+              className={`px-6 py-2 rounded-lg text-sm font-semibold transition ${
+                activeTab === 'results'
+                  ? 'bg-slate-800 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Hasil
+            </button>
+          </div>
+        </div>
+
+        {activeTab === 'modules' ? (
+          <div>
+            <div className="text-center mb-8">
+              <h1 className="text-2xl font-bold text-white mb-1">Manajemen Modul Kuis</h1>
+              <p className="text-sm text-slate-400">Buat kuis baru atau atur modul yang sudah ada.</p>
+            </div>
+
+            {/* Form Upload AI */}
+            <div className="max-w-xl mx-auto bg-slate-900/60 border border-slate-800/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl mb-12">
+              <h2 className="text-base font-semibold text-white mb-4 flex items-center gap-2">
+                <span>📄</span> Buat Modul Baru dari Dokumen
+              </h2>
+
+              {error && (
+                <div className="p-3 mb-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs">
+                  {error}
+                </div>
+              )}
+
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-400 mb-1">Judul Modul</label>
+                    <input
+                      type="text"
+                      value={title}
+                      onChange={e => setTitle(e.target.value)}
+                      placeholder="Contoh: Fikih Jinayah"
+                      className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-cyan-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-400 mb-1">Kode Akses Kuis</label>
+                    <input
+                      type="text"
+                      value={code}
+                      onChange={e => setCode(e.target.value)}
+                      placeholder="Contoh: 1528"
+                      className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-cyan-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Rombel / Kelas (Pisahkan dengan koma)</label>
+                  <input
+                    type="text"
+                    value={classes}
+                    onChange={e => setClasses(e.target.value)}
+                    placeholder="PMH, HES, AS"
+                    className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Dokumen Materi (.pdf / .docx)</label>
+                  <input
+                    type="file"
+                    accept=".pdf,.docx"
+                    onChange={e => setFile(e.target.files?.[0] || null)}
+                    className="w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-cyan-500/10 file:text-cyan-400 hover:file:bg-cyan-500/20 cursor-pointer"
+                  />
+                </div>
+
+                <button
+                  onClick={handleUpload}
+                  disabled={loading}
+                  className="w-full py-3 rounded-xl font-semibold text-sm text-white bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:opacity-90 transition disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {loading ? 'AI Sedang Menelaah Dokumen & Menyusun Kuis...' : '⚡ Generate Soal Kuis (AI)'}
+                </button>
+              </div>
+            </div>
+
+            {/* List Modul */}
+            <div>
+              <h3 className="text-lg font-bold text-white mb-4">Modul Aktif</h3>
+              {modules.length === 0 ? (
+                <div className="p-8 text-center bg-slate-900/40 border border-slate-800 rounded-xl text-slate-400 text-sm">
+                  Belum ada modul kuis. Unggah dokumen materi di atas untuk membuat modul otomatis.
+                </div>
+              ) : (
+                <div className="grid md:grid-cols-2 gap-4">
+                  {modules.map(mod => (
+                    <div key={mod.id} className="bg-slate-900/60 border border-slate-800 rounded-xl p-5 flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="px-2.5 py-1 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-xs font-semibold">
+                            Kode: {mod.code}
+                          </span>
+                          <span className="text-xs text-slate-400">{mod.questions?.length || 0} Soal</span>
+                        </div>
+                        <h4 className="text-base font-semibold text-white mb-1">{mod.title}</h4>
+                        <p className="text-xs text-slate-400">Kelas: {mod.classes?.join(', ')}</p>
+                      </div>
+
+                      <div className="flex items-center gap-2 mt-5">
+                        <button
+                          onClick={() => onStartProjector(mod)}
+                          className="flex-1 py-2 rounded-lg bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 text-xs font-semibold transition border border-emerald-500/30"
+                        >
+                          Mulai Proyektor
+                        </button>
+                        <button
+                          onClick={() => handleDeleteModule(mod.id)}
+                          className="px-3 py-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 text-xs font-semibold transition border border-red-500/20"
+                        >
+                          Hapus
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          /* Hasil Kuis */
+          <div>
+            <div className="text-center mb-8">
+              <h1 className="text-2xl font-bold text-white mb-1">Hasil & Nilai Mahasiswa</h1>
+              <p className="text-sm text-slate-400">Daftar rekapan hasil pengerjaan kuis.</p>
+            </div>
+
+            {results.length === 0 ? (
+              <div className="p-8 text-center bg-slate-900/40 border border-slate-800 rounded-xl text-slate-400 text-sm">
+                Belum ada mahasiswa yang menyelesaikan kuis.
+              </div>
+            ) : (
+              <div className="overflow-x-auto bg-slate-900/60 border border-slate-800 rounded-xl">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-slate-950/80 text-xs text-slate-400 uppercase tracking-wider border-b border-slate-800">
+                    <tr>
+                      <th className="py-3.5 px-4">Nama</th>
+                      <th className="py-3.5 px-4">NIM</th>
+                      <th className="py-3.5 px-4">Kelas</th>
+                      <th className="py-3.5 px-4">Modul</th>
+                      <th className="py-3.5 px-4 text-center">Benar</th>
+                      <th className="py-3.5 px-4 text-right">Skor Akhir</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800">
+                    {results.map((res: any, idx: number) => (
+                      <tr key={idx} className="hover:bg-slate-800/30">
+                        <td className="py-3 px-4 font-medium text-white">{res.studentName}</td>
+                        <td className="py-3 px-4 text-slate-400 text-xs">{res.nim}</td>
+                        <td className="py-3 px-4 text-slate-400 text-xs">{res.className}</td>
+                        <td className="py-3 px-4 text-slate-300">{res.moduleTitle || '-'}</td>
+                        <td className="py-3 px-4 text-center text-slate-300">
+                          {res.correctAnswers} / {res.totalQuestions}
+                        </td>
+                        <td className="py-3 px-4 text-right font-bold text-emerald-400">{res.score}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default DashboardAdminDosen;
