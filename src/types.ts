@@ -49,5 +49,5 @@ export interface QuizResult {
   wrongAnswers: number;
   cheatingFlags: number;
   submittedAt: number;
-  details?: { questionIdx: number, selectedIdx: number, correctIdx: number }[];
+  details?: { questionIdx: number, selectedIdx: number, correctIdx: number, questionText?: string, options?: string[] }[];
 }

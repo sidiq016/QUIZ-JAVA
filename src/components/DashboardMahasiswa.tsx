@@ -102,7 +102,7 @@ export default function DashboardMahasiswa({ user: initialUser, onLogout, onStar
       <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-blue-500/20 rounded-full blur-[120px]" />
       <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-emerald-500/20 rounded-full blur-[120px]" />
 
-      <header className="relative z-20 flex items-center justify-between p-6 lg:px-12 border-b border-white/10 bg-white/5 backdrop-blur-md">
+      <header className="relative z-20 flex items-center justify-between py-3 px-6 lg:px-12 border-b border-white/10 bg-white/5 backdrop-blur-md">
         <div className="flex items-center gap-4">
           <button onClick={() => setIsSidebarOpen(true)} className="p-2 hover:bg-white/10 rounded-xl transition-colors text-slate-300">
             <Menu className="w-6 h-6" />
